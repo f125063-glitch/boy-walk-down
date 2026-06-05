@@ -76,10 +76,10 @@ function layoutBtns(cw,ch) {
     el.style.cssText+=`;width:${bw}px;height:${bh}px;font-size:${fs};`+
       `left:${l!=null?l+'px':'auto'};right:${r!=null?r+'px':'auto'};bottom:${b}px;top:auto`;
   }
-  pos('tb-left',  mg,         null, bt);
-  pos('tb-right', mg+bw+sp,   null, bt);
-  pos('tb-up',    null, mg+bw+sp, bt+Math.round(38*CS));
-  pos('tb-down',  null, mg,       bt);
+  pos('tb-left',  null, mg+bw+sp, bt);
+  pos('tb-right', null, mg,       bt);
+  pos('tb-up',    mg+bw+sp,   null, bt+Math.round(38*CS));
+  pos('tb-down',  mg,         null, bt);
 }
 window.addEventListener('resize', resize);
 resize();
