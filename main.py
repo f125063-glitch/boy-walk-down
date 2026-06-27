@@ -558,9 +558,14 @@ class Platform:
             color = (r, g, b)
         elif self.type == "golden":
             color = GOLDEN
-        # In extra-bonus/grayscale mode, all platforms turn golden
-        if self.is_invert_mode and self.type != "spike":
-            color = GOLDEN
+            pulse = 0.5 + 0.5 * math.sin(pygame.time.get_ticks() / 150.0)
+            glow_surf = pygame.Surface((self.rect.width + 16, self.rect.height + 16), pygame.SRCALPHA)
+            for i in range(1, 5):
+                alpha = int(255 * (0.8 - i * 0.15) * pulse)
+                if alpha > 0:
+                    pygame.draw.rect(glow_surf, (255, 255, 255, alpha), 
+                                     (8 - i*2, 8 - i*2, self.rect.width + i*4, self.rect.height + i*4), 2)
+            surface.blit(glow_surf, (self.rect.x - 8, self.rect.y - 8))
         pygame.draw.rect(surface, color, self.rect)
         pygame.draw.rect(surface, BLACK, self.rect, 2)
         
@@ -838,15 +843,16 @@ def main():
     btn_pause = pygame.Rect(10, 10, 62, 30)
     btn_stop  = pygame.Rect(80, 10, 52, 30)
     btn_speed_050 = pygame.Rect(140, 10, 52, 30)
-    btn_speed_150 = pygame.Rect(200, 10, 52, 30)
-    btn_speed_200 = pygame.Rect(260, 10, 52, 30)
+    btn_speed_100 = pygame.Rect(200, 10, 52, 30)
+    btn_speed_150 = pygame.Rect(260, 10, 52, 30)
     
     ctrl_pressed_last_frame = False
     running = True
     while running:
         player.score = min(99999, player.score)
         auto_speed_mult = 1.0
-        if player.score >= 401: auto_speed_mult = 1.4
+        if player.score >= 701: auto_speed_mult = 1.5
+        elif player.score >= 501: auto_speed_mult = 1.4
         elif player.score >= 301: auto_speed_mult = 1.3
         elif player.score >= 201: auto_speed_mult = 1.2
         elif player.score >= 101: auto_speed_mult = 1.1
@@ -863,7 +869,8 @@ def main():
             _invert_bg = bg_image_rainbow9 if bg_image_rainbow9 else bg_image
             if _invert_bg:
                 bg_alpha = 204
-                if player.score >= 401: bg_alpha = 255
+                if player.score >= 701: bg_alpha = 255
+                elif player.score >= 501: bg_alpha = 255
                 elif player.score >= 301: bg_alpha = 242
                 elif player.score >= 201: bg_alpha = 229
                 elif player.score >= 101: bg_alpha = 216
@@ -877,7 +884,8 @@ def main():
             screen.fill(WHITE)
             if bg_image:
                 bg_alpha = 204
-                if player.score >= 401: bg_alpha = 255
+                if player.score >= 701: bg_alpha = 255
+                elif player.score >= 501: bg_alpha = 255
                 elif player.score >= 301: bg_alpha = 242
                 elif player.score >= 201: bg_alpha = 229
                 elif player.score >= 101: bg_alpha = 216
@@ -922,7 +930,7 @@ def main():
                     if state in ["PLAYING", "PAUSED"]:
                         up_key_escape_count = 0
                     if state in ["START", "GAME_OVER", "PAUSED"]:
-                        speeds = [0.5, 1.0, 1.5, 2.0]
+                        speeds = [0.5, 1.0, 1.5]
                         try:
                             idx = speeds.index(speed_multiplier)
                         except ValueError:
@@ -935,7 +943,7 @@ def main():
                     if state in ["PLAYING", "PAUSED"]:
                         up_key_escape_count = 0
                     if state in ["START", "GAME_OVER", "PAUSED"]:
-                        speeds = [0.5, 1.0, 1.5, 2.0]
+                        speeds = [0.5, 1.0, 1.5]
                         try:
                             idx = speeds.index(speed_multiplier)
                         except ValueError:
@@ -1031,19 +1039,7 @@ def main():
                     p_x = random.randint(0, WIDTH - 100)
                     r = random.random()
                     if player.invert_timer > 0:
-                        # In extra-bonus/grayscale mode: include golden platforms
-                        if r < 0.20:
-                            p_type = "golden"
-                        elif r < 0.60:
-                            p_type = "normal"
-                        elif r < 0.75:
-                            p_type = "spike"
-                        elif r < 0.82:
-                            p_type = "heal"
-                        elif r < 0.90:
-                            p_type = "fade"
-                        else:
-                            p_type = "purple"
+                        p_type = "golden"
                     else:
                         if r < 0.60:
                             p_type = "normal"
@@ -1060,9 +1056,8 @@ def main():
                     platforms.append(new_p)
                     # 分數只在踩到深灰色/綠色階梯時計算，不再依時間增加
 
-                # Update platforms — sync is_invert_mode for all existing platforms
+                # Update platforms
                 for p in platforms:
-                    p.is_invert_mode = (player.invert_timer > 0)
                     p.update()
 
                 # Clean up platforms (off-screen or fully faded)
@@ -1093,12 +1088,6 @@ def main():
                             player.up_used_this_fall = False  # restore 1 up-boost for next fall
                             player.fly_up_count = 0
                         eff_type = p.type
-                        if player.invert_timer > 0:
-                            if eff_type != "spike":
-                                eff_type = "heal"
-                            else:
-                                eff_type = "cancelled"
-
                         if eff_type == "spike":
                             player.modify_health(-1)
                             if is_new_landing:
@@ -1177,8 +1166,6 @@ def main():
                 # Hold-down penetration logic
                 if player.current_platform:
                     p_type_pen = player.current_platform.type
-                    if player.invert_timer > 0 and p_type_pen != "spike":
-                        p_type_pen = "heal"
                     
                     if p_type_pen in ["normal", "heal", "golden"]:
                         if keys[pygame.K_DOWN]:
@@ -1251,10 +1238,12 @@ def main():
                 if player.rect.top > HEIGHT or player.health <= 0:
                     # --- Compute final rating ---
                     # Composite score: score(50) + stairs(30) + speed(20) = 100 max
-                    speed_factor = (speed_multiplier - 0.5) / 1.5         # 0.5×→0, 2.0×→1 (proportional)
+                    speed_factor = (speed_multiplier - 0.5) / 1.5         # proportional
                     composite = (player.score / 400.0) * 50.0 \
                                + (total_stairs_stepped / 100.0) * 30.0 \
                                + speed_factor * 20.0
+                    if starting_speed_multiplier in [1.0, 1.5]:
+                        composite = composite / 1.25
                     composite = max(0.0, min(composite, 100.0))
                     
                     if composite >= 80:
@@ -1485,28 +1474,34 @@ def main():
             state = "START"
             speed_multiplier = 1.0
  
-        # Speed Buttons — available in START, GAME_OVER, and PAUSED
-        for btn, mult, text in [(btn_speed_050, 0.5, "0.5倍"), (btn_speed_150, 1.5, "1.5倍"), (btn_speed_200, 2.0, "2.0倍")]:
-            sp_clickable = (state in ["START", "GAME_OVER", "PAUSED"])
-            is_selected = (speed_multiplier == mult)
-            sp_pressed = sp_clickable and btn.collidepoint(mouse_pos) and mouse_clicked
-            
-            if is_selected:
-                sp_color = KIDS_YELLOW
-            elif not sp_clickable:
-                sp_color = KIDS_DISABLED
-            elif btn.collidepoint(mouse_pos):
-                sp_color = KIDS_BLUE
-            else:
-                sp_color = KIDS_LIGHT_BLUE
-            
-            draw_3d_button(screen, btn, sp_color, text, font_small, BLACK,
-                           border_radius=8, pressed=sp_pressed, disabled=not sp_clickable)
-            
-            if sp_clickable and mouse_clicked and btn.collidepoint(mouse_pos):
-                speed_multiplier = mult
-                if state == "GAME_OVER":
-                    score_style_alt = True
+        # Speed Buttons — only available in START, GAME_OVER
+        if state in ["START", "GAME_OVER"]:
+            for btn, mult, text in [(btn_speed_050, 0.5, "0.5倍"), (btn_speed_100, 1.0, "1.0倍"), (btn_speed_150, 1.5, "1.5倍")]:
+                is_selected = (speed_multiplier == mult)
+                sp_pressed = btn.collidepoint(mouse_pos) and mouse_clicked
+                
+                if is_selected:
+                    sp_color = KIDS_YELLOW
+                elif btn.collidepoint(mouse_pos):
+                    sp_color = KIDS_BLUE
+                else:
+                    sp_color = KIDS_LIGHT_BLUE
+                
+                draw_3d_button(screen, btn, sp_color, text, font_small, BLACK,
+                               border_radius=8, pressed=sp_pressed, disabled=False)
+                
+                if mouse_clicked and btn.collidepoint(mouse_pos):
+                    speed_multiplier = mult
+                    if state == "GAME_OVER":
+                        score_style_alt = True
+        elif state in ["PLAYING", "PAUSED"]:
+            font_bold_small = pygame.font.SysFont("microsoftjhenghei", 16, bold=True)
+            try:
+                actual_speed_val = current_speed
+            except NameError:
+                actual_speed_val = speed_multiplier
+            text_surf = font_bold_small.render(f"實際倍速: {actual_speed_val:.2f}", True, WHITE)
+            screen.blit(text_surf, (140, 15))
 
         pygame.display.flip()
 
