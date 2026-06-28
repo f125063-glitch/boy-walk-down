@@ -1243,19 +1243,34 @@ def main():
                                + (total_stairs_stepped / 100.0) * 30.0 \
                                + speed_factor * 20.0
                     if starting_speed_multiplier in [1.0, 1.5]:
-                        composite = composite / 1.25
+                        composite = composite / 1.5625
                     composite = max(0.0, min(composite, 100.0))
                     
+                    rating_tier = 1
                     if composite >= 80:
-                        game_rating = "最優秀"
+                        rating_tier = 5
                     elif composite >= 60:
-                        game_rating = "非常棒"
+                        rating_tier = 4
                     elif composite >= 40:
-                        game_rating = "很優秀"
+                        rating_tier = 3
                     elif composite >= 20:
-                        game_rating = "比個讚"
+                        rating_tier = 2
+
+                    if rating_tier == 5 and player.score < 999:
+                        rating_tier = 4
+                    if rating_tier == 4 and player.score < 777:
+                        rating_tier = 3
+
+                    if rating_tier == 5:
+                        game_rating = "★★★★★ 最優秀"
+                    elif rating_tier == 4:
+                        game_rating = "★★★★ 非常棒"
+                    elif rating_tier == 3:
+                        game_rating = "★★★ 很優秀"
+                    elif rating_tier == 2:
+                        game_rating = "★★ 比個讚"
                     else:
-                        game_rating = "有進步"
+                        game_rating = "★ 有進步"
                         
                     if player.score == 0:
                         game_rating = "放鬆一下,再試一次"
@@ -1500,8 +1515,8 @@ def main():
                 actual_speed_val = current_speed
             except NameError:
                 actual_speed_val = speed_multiplier
-            text_surf = font_bold_small.render(f"實際倍速: {actual_speed_val:.2f}", True, WHITE)
-            screen.blit(text_surf, (140, 15))
+            speed_text = f"實際倍速: {actual_speed_val:.2f}"
+            draw_outlined_text(speed_text, font_bold_small, WHITE, screen, 140, 15 + font_bold_small.get_height() // 2, SCORE_L1_OFFSETS, SCORE_L2_OFFSETS, outline_color1=BLACK, outline_color2=WHITE, align="left")
 
         pygame.display.flip()
 

@@ -1158,7 +1158,7 @@ function updateGame(){
                     (totalStairs / 100.0) * 30.0 +
                     speedFactor * 20.0;
     if (startingSpeedMult === 1.0 || startingSpeedMult === 1.5) {
-      composite = composite / 1.25;
+      composite = composite / 1.5625;
     }
     composite = Math.max(0.0, Math.min(composite, 100.0));
     
@@ -1167,6 +1167,9 @@ function updateGame(){
     else if(composite >= 40) gameRating = 3;
     else if(composite >= 20) gameRating = 2;
     else gameRating = 1;
+
+    if(gameRating === 5 && player.score < 999) gameRating = 4;
+    if(gameRating === 4 && player.score < 777) gameRating = 3;
     
     if(player.score === 0) gameRating = 1;
 
@@ -1288,11 +1291,8 @@ function drawTopBarUI(){
     else if (player.score >= 101) autoSpeedMult = 1.1;
     let actualSpeed = speedMult * autoSpeedMult;
     if (player.speedTimer > 0) actualSpeed = (actualSpeed < 1.0) ? 0.5 : 1.0;
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold ' + F_SM;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`實際倍速: ${actualSpeed.toFixed(2)}`, 140, 25);
+    let speedText = `實際倍速: ${actualSpeed.toFixed(2)}`;
+    drawOutlined(speedText, 'bold ' + F_SM, '#fff', 140, 25, 4, 6, '#000', '#fff', 1, 0, '#000', 'left');
   }
 }
 
