@@ -259,7 +259,8 @@ class Player:
         self.hit_top_spike = False   # currently touching top spikes
         self.on_spike_platform = False  # currently standing on red spike platform
         self.last_landed_platform = None  # track last platform to avoid repeated counting
-        self.down_key_timer = 0.0
+        self.down_press_count = 0
+        self.down_last_press_time = 0.0
         self.up_key_timer = 0.0        # tracks how long up is held
         self.up_key_was_pressed = False # tracks previous frame state
         self.up_boosting = False       # True while ball is actively rising from boost
@@ -464,27 +465,6 @@ class Player:
         surface.blit(s, self.rect.topleft)
 
         pygame.draw.circle(surface, BLACK, self.rect.center, radius, 2)
-
-        # Draw a sleek progress bar when charging penetration
-        if self.down_key_timer > 0.0 and self.current_platform:
-            bar_width = self.rect.width
-            bar_height = 4
-            bar_x = self.rect.x
-            bar_y = self.rect.y - 10
-            # Background bar
-            pygame.draw.rect(surface, (50, 50, 50), (bar_x, bar_y, bar_width, bar_height), border_radius=2)
-            # Progress fill
-            progress = min(self.down_key_timer / 0.6, 1.0)
-            fill_width = int(bar_width * progress)
-            # In invert mode penetration heals; golden/heal stairs are always safe
-            if self.current_platform.type in ["heal", "golden"]:
-                bar_color = (100, 255, 100)
-            elif self.current_platform.type == "normal":
-                # Green when invert mode (heals), red otherwise (damages)
-                bar_color = (100, 255, 100) if self.invert_timer > 0 else (255, 100, 100)
-            else:
-                bar_color = (100, 255, 100)
-            pygame.draw.rect(surface, bar_color, (bar_x, bar_y, fill_width, bar_height), border_radius=2)
 
 class Platform:
     def __init__(self, x, y, p_type="normal"):
@@ -918,6 +898,21 @@ def main():
                             selected_menu_index = 0
                         else:
                             up_key_escape_count = 0
+                            if state == "PLAYING" and player.current_platform and player.current_platform.type in ["normal", "heal", "golden"]:
+                                current_time = pygame.time.get_ticks() / 1000.0
+                                if current_time - player.down_last_press_time < 0.4:
+                                    player.down_press_count += 1
+                                else:
+                                    player.down_press_count = 1
+                                player.down_last_press_time = current_time
+                                
+                                if player.down_press_count >= 2:
+                                    # Penetrate!
+                                    player.rect.y += 25
+                                    if player.invert_timer <= 0 and player.current_platform.type == "normal":
+                                        player.modify_health(-1)
+                                    player.down_press_count = 0
+                                    player.current_platform = None
                 elif event.key == pygame.K_UP:
                     if state in ["START", "GAME_OVER"]:
                         selected_menu_index = (selected_menu_index - 1) % 2
@@ -1113,7 +1108,8 @@ def main():
                                     p.healed_amount += 1
                         elif eff_type == "fade":
                             if is_new_landing:
-                                player.modify_health(-1)
+                                if player.invert_timer <= 0:
+                                    player.modify_health(-1)
                                 if player.rainbow_mode and not player.is_fly_mode:
                                     player.rainbow_mode = False
                                     player.score_multiplier = 1
@@ -1123,14 +1119,15 @@ def main():
                             p.fading = True
                         elif eff_type == "purple":
                             if is_new_landing:
-                                if player.rainbow_mode and not player.is_fly_mode:
-                                    player.rainbow_mode = False
-                                    player.score_multiplier = 1
-                                    player.rainbow_outline_timer = 0.0
-                                player.combo_green_blue = 0
-                                player.rainbow_safe_combo = 0
-                                player.invert_timer = 0.0
-                                player.speed_timer = 0.0
+                                if player.invert_timer <= 0:
+                                    if player.rainbow_mode and not player.is_fly_mode:
+                                        player.rainbow_mode = False
+                                        player.score_multiplier = 1
+                                        player.rainbow_outline_timer = 0.0
+                                    player.combo_green_blue = 0
+                                    player.rainbow_safe_combo = 0
+                                    player.invert_timer = 0.0
+                                    player.speed_timer = 0.0
                             if not p.triggered:
                                 p.triggered = True
                                 p.trigger_timer = 0.0
@@ -1163,27 +1160,7 @@ def main():
                 if on_platform:
                     player.history.clear()
 
-                # Hold-down penetration logic
-                if player.current_platform:
-                    p_type_pen = player.current_platform.type
-                    
-                    if p_type_pen in ["normal", "heal", "golden"]:
-                        if keys[pygame.K_DOWN]:
-                            player.down_key_timer += 1.0 / 60.0
-                        if player.down_key_timer >= 0.6:
-                            # Penetrate!
-                            player.rect.y += 25
-                            if player.invert_timer > 0:
-                                # Extra-bonus/grayscale mode: heal +1 on penetration
-                                player.modify_health(1)
-                            elif player.current_platform.type == "normal":
-                                player.modify_health(-1)
-                            player.down_key_timer = 0.0
-                            player.current_platform = None
-                    else:
-                        player.down_key_timer = 0.0
-                else:
-                    player.down_key_timer = 0.0
+                # Penetration logic is now handled in the KEYDOWN event loop
 
                 # Up-key boost logic
                 if keys[pygame.K_UP]:
