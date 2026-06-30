@@ -1059,21 +1059,21 @@ function updateGame(){
       } else if(effType==='heal' || effType==='golden'){
         if(isNew){player.combo++;player.healLand=0;player.score+=2*player.scoreMult;
           // Rainbow safe combo tracking (normal game mode only)
-          if(player.rainbow&&!player.flyMode){player.rainbowSafeCombo++;if(player.rainbowSafeCombo>=6){player.score+=18;player.rainbowSafeCombo=0;player.extraT=0;}}
+          if(player.rainbow){player.rainbowSafeCombo++;if(player.rainbowSafeCombo>=6){player.score+=18;player.rainbowSafeCombo=0;player.extraT=0;}}
         }
         if(player.hp<player.maxHp&&p.healed<3){player.healLand++;if(player.healLand>=45){player.healLand=0;player.hurt(1);p.healed++;}}
       } else if(effType==='fade'){
         if(isNew){
           // White (fade) stair: deduct 1 HP unless in extra-bonus mode
           if(player.invertTimer <= 0) player.hurt(-1);
-          if(player.rainbow&&!player.flyMode){player.rainbow=false;player.scoreMult=1;player.rainbowOutT=0;}
+          if(player.rainbow){player.rainbow=false;player.scoreMult=1;player.rainbowOutT=0;}
           player.combo=0;player.rainbowSafeCombo=0;
         }
         p.fading=true;
       } else if(effType==='purple'){
         if(isNew){
           if(player.invertTimer <= 0){
-            if(player.rainbow&&!player.flyMode){player.rainbow=false;player.scoreMult=1;player.rainbowOutT=0;}
+            if(player.rainbow){player.rainbow=false;player.scoreMult=1;player.rainbowOutT=0;}
             player.invertTimer=0;player.speedTimer=0;
             player.combo=0;player.rainbowSafeCombo=0;
           }
@@ -1084,7 +1084,7 @@ function updateGame(){
         if(isNew){
           platforms.forEach(pl=>{if(pl!==p)pl.type='heal';});
           player.combo++;player.normLand=0;player.score+=1*player.scoreMult;
-          if(player.rainbow&&!player.flyMode){player.rainbowSafeCombo++;if(player.rainbowSafeCombo>=6){player.score+=18;player.rainbowSafeCombo=0;player.extraT=0;player.triggerExtraBonus();}}
+          if(player.rainbow){player.rainbowSafeCombo++;if(player.rainbowSafeCombo>=6){player.score+=18;player.rainbowSafeCombo=0;player.extraT=0;player.triggerExtraBonus();}}
         }
         if(player.hp<player.maxHp&&p.healed<1){player.normLand++;if(player.normLand>=60){player.normLand=0;player.hurt(1);p.healed++;}}
       } else if(effType==='black'){
@@ -1100,12 +1100,12 @@ function updateGame(){
             player.hurt(-1);player.combo=0; player.onSpikeP=true;
           } else if(effChosen==='heal' || effChosen==='golden'){
             player.combo++;player.healLand=0;player.score+=2*player.scoreMult;
-            if(player.rainbow&&!player.flyMode){player.rainbowSafeCombo++;if(player.rainbowSafeCombo>=6){player.score+=18;player.rainbowSafeCombo=0;player.extraT=0;}}
+            if(player.rainbow){player.rainbowSafeCombo++;if(player.rainbowSafeCombo>=6){player.score+=18;player.rainbowSafeCombo=0;player.extraT=0;}}
           } else if(effChosen==='fade'){
-            player.hurt(-1);if(player.rainbow&&!player.flyMode){player.rainbow=false;player.scoreMult=1;player.rainbowOutT=0;}player.combo=0;player.rainbowSafeCombo=0;
+            player.hurt(-1);if(player.rainbow){player.rainbow=false;player.scoreMult=1;player.rainbowOutT=0;}player.combo=0;player.rainbowSafeCombo=0;
             p.fading=true;
           } else if(effChosen==='purple'){
-            if(player.rainbow&&!player.flyMode){player.rainbow=false;player.scoreMult=1;player.rainbowOutT=0;player.invertTimer=0;player.speedTimer=0;}player.combo=0;player.rainbowSafeCombo=0;
+            if(player.rainbow){player.rainbow=false;player.scoreMult=1;player.rainbowOutT=0;player.invertTimer=0;player.speedTimer=0;}player.combo=0;player.rainbowSafeCombo=0;
             p.triggered=true;p.trigT=0;
           } else if(effChosen==='colorful'){
             platforms.forEach(pl=>{if(pl!==p)pl.type='heal';});
@@ -1113,7 +1113,7 @@ function updateGame(){
           } else if(effChosen==='normal') {
             // normal (灰色)
             player.combo++;player.normLand=0;player.score+=1*player.scoreMult;
-            if(player.rainbow&&!player.flyMode){player.rainbowSafeCombo++;if(player.rainbowSafeCombo>=6){player.score+=18;player.rainbowSafeCombo=0;player.extraT=0;player.triggerExtraBonus();}}
+            if(player.rainbow){player.rainbowSafeCombo++;if(player.rainbowSafeCombo>=6){player.score+=18;player.rainbowSafeCombo=0;player.extraT=0;player.triggerExtraBonus();}}
           }
         } else {
           // 已變身後按新類型繼續處理（讓原有碰撞在下一幀生效）
@@ -1121,7 +1121,7 @@ function updateGame(){
       } else if(effType==='normal') {
         if(isNew){player.combo++;player.normLand=0;player.score+=1*player.scoreMult;
           // Rainbow safe combo tracking (normal game mode only)
-          if(player.rainbow&&!player.flyMode){player.rainbowSafeCombo++;if(player.rainbowSafeCombo>=6){player.score+=18;player.rainbowSafeCombo=0;player.extraT=0;player.triggerExtraBonus();}}
+          if(player.rainbow){player.rainbowSafeCombo++;if(player.rainbowSafeCombo>=6){player.score+=18;player.rainbowSafeCombo=0;player.extraT=0;player.triggerExtraBonus();}}
         }
         if(player.hp<player.maxHp&&p.healed<1){player.normLand++;if(player.normLand>=60){player.normLand=0;player.hurt(1);p.healed++;}}
       }
@@ -1321,8 +1321,8 @@ function drawFrame(){
     const ta=((Date.now()%2000)/2000)*(242/255);
     drawOutlined('球球大冒險',F_LG,'#000',GW/2,GH/3,4,9,'#fff','#000',ta);
     if(mInR([GW/2-80,btnSY,160,60]))selIdx=0; if(mInR([GW/2-80,btnFY,160,60]))selIdx=1;
-    drawBtn(GW/2-80,btnSY,160,60,[255,120,0],'開始遊戲',selIdx===0?F_MED_B:F_MED,'#fff',15);
-    drawBtn(GW/2-80,btnFY,160,60,[255,105,180],'飛高高吧',selIdx===1?F_MED_B:F_MED,'#fff',15);
+    drawBtn(GW/2-80,btnSY,160,60,[[139,0,0],[255,102,102]],'開始遊戲',selIdx===0?F_MED_B:F_MED,'#fff',15);
+    drawBtn(GW/2-80,btnFY,160,60,[[0,100,0],[144,238,144]],'飛高高吧',selIdx===1?F_MED_B:F_MED,'#fff',15);
     drawTopBarUI();
 
   } else if(state==='PLAYING'||state==='PAUSED'){

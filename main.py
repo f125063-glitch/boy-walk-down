@@ -996,7 +996,7 @@ def main():
 
             # Start Button (3D) — normal mode
             pressed = btn_start.collidepoint(mouse_pos) and mouse_clicked
-            color = KIDS_ORANGE
+            color = [(139, 0, 0), (255, 102, 102)]
             current_font = font_medium_bold if selected_menu_index == 0 else font_medium
             draw_3d_button(screen, btn_start, color, "開始遊戲", current_font, WHITE,
                            border_radius=15, pressed=pressed)
@@ -1010,7 +1010,7 @@ def main():
 
             # Fly Button (3D) — unlimited up-boost, no HP cost
             fly_pressed = btn_fly.collidepoint(mouse_pos) and mouse_clicked
-            fly_color = KIDS_PINK
+            fly_color = [(0, 100, 0), (144, 238, 144)]
             current_font_fly = font_medium_bold if selected_menu_index == 1 else font_medium
             draw_3d_button(screen, btn_fly, fly_color, "飛高高吧", current_font_fly, WHITE,
                            border_radius=15, pressed=fly_pressed)
@@ -1093,7 +1093,7 @@ def main():
                                 player.combo_green_blue += 1
                                 player.heal_land_counter = 0
                                 player.score += 2 * player.score_multiplier
-                                if player.rainbow_mode and not player.is_fly_mode:
+                                if player.rainbow_mode:
                                     player.rainbow_safe_combo += 1
                                     if player.rainbow_safe_combo >= 6:
                                         player.score += 18
@@ -1110,7 +1110,7 @@ def main():
                             if is_new_landing:
                                 if player.invert_timer <= 0:
                                     player.modify_health(-1)
-                                if player.rainbow_mode and not player.is_fly_mode:
+                                if player.rainbow_mode:
                                     player.rainbow_mode = False
                                     player.score_multiplier = 1
                                     player.rainbow_outline_timer = 0.0
@@ -1120,7 +1120,7 @@ def main():
                         elif eff_type == "purple":
                             if is_new_landing:
                                 if player.invert_timer <= 0:
-                                    if player.rainbow_mode and not player.is_fly_mode:
+                                    if player.rainbow_mode:
                                         player.rainbow_mode = False
                                         player.score_multiplier = 1
                                         player.rainbow_outline_timer = 0.0
@@ -1136,7 +1136,7 @@ def main():
                                 player.combo_green_blue += 1
                                 player.normal_land_counter = 0
                                 player.score += 1 * player.score_multiplier
-                                if player.rainbow_mode and not player.is_fly_mode:
+                                if player.rainbow_mode:
                                     player.rainbow_safe_combo += 1
                                     if player.rainbow_safe_combo >= 6:
                                         player.score += 18
