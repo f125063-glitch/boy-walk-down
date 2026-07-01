@@ -939,7 +939,7 @@ window.addEventListener('keydown',e=>{
       else {
         escCnt=0;
         // Double-press DOWN to penetrate platform
-        if(state==='PLAYING' && player && player.curPlat && ['normal','heal','golden'].includes(player.curPlat.type)){
+        if(state==='PLAYING' && player && player.curPlat && ['normal','heal','golden','colorful'].includes(player.curPlat.type)){
           const now = performance.now() / 1000;
           if(now - player.downLastPressTime < 0.4){
             player.downPressCount++;
@@ -951,6 +951,10 @@ window.addEventListener('keydown',e=>{
             player.y += 25;
             if(player.invertTimer <= 0 && player.curPlat.type === 'normal'){
               player.hurt(-1);
+            }
+            // 穿透金黃色階梯：回血1格
+            if(player.curPlat.type === 'golden'){
+              player.hurt(1);
             }
             player.downPressCount = 0;
             player.curPlat = null;
@@ -994,7 +998,7 @@ const touchPressedDirs = new Set();
       if(dir==='right'){const sp=[.5,1,1.5];let i=sp.indexOf(speedMult);if(i<0)i=1;speedMult=sp[Math.min(2,i+1)];}
     }
     // Double-tap DOWN to penetrate (touch version)
-    if(dir==='down' && state==='PLAYING' && player && player.curPlat && ['normal','heal','golden'].includes(player.curPlat.type)){
+    if(dir==='down' && state==='PLAYING' && player && player.curPlat && ['normal','heal','golden','colorful'].includes(player.curPlat.type)){
       const now = performance.now() / 1000;
       if(now - player.downLastPressTime < 0.4){
         player.downPressCount++;
@@ -1006,6 +1010,10 @@ const touchPressedDirs = new Set();
         player.y += 25;
         if(player.invertTimer <= 0 && player.curPlat.type === 'normal'){
           player.hurt(-1);
+        }
+        // 穿透金黃色階梯：回血1格
+        if(player.curPlat.type === 'golden'){
+          player.hurt(1);
         }
         player.downPressCount = 0;
         player.curPlat = null;
@@ -1067,7 +1075,13 @@ function updateGame(){
       let effType = p.type;
 
       if(effType==='spike'){
-        player.hurt(-1); if(isNew)player.combo=0; player.onSpikeP=true;
+        // 星空模式(fly)下，踩到已出現的紅色階梯不扣血
+        if(gameMode==='fly' && p.stepped) {
+          // no damage in fly mode for already-appeared spike
+        } else {
+          player.hurt(-1);
+        }
+        if(isNew)player.combo=0; player.onSpikeP=true;
       } else if(effType==='heal' || effType==='golden'){
         if(isNew){player.combo++;player.healLand=0;player.score+=2*player.scoreMult;
           // Rainbow safe combo tracking (normal game mode only)
@@ -1092,13 +1106,13 @@ function updateGame(){
         }
         if(!p.triggered){p.triggered=true;p.trigT=0;}
       } else if(effType==='colorful'){
-        // 彩色階梯：將畫面所有階梯及其行為改為綠色（heal）
+        // 彩色階梯：分數+3，回血機制同綠色（heal），最多回血3次，站45幀回1格
         if(isNew){
           platforms.forEach(pl=>{if(pl!==p)pl.type='heal';});
-          player.combo++;player.normLand=0;player.score+=1*player.scoreMult;
+          player.combo++;player.healLand=0;player.score+=3*player.scoreMult;
           if(player.rainbow){player.rainbowSafeCombo++;if(player.rainbowSafeCombo>=6){player.score+=18;player.rainbowSafeCombo=0;player.extraT=0;player.triggerExtraBonus();}}
         }
-        if(player.hp<player.maxHp&&p.healed<1){player.normLand++;if(player.normLand>=60){player.normLand=0;player.hurt(1);p.healed++;}}
+        if(player.hp<player.maxHp&&p.healed<3){player.healLand++;if(player.healLand>=45){player.healLand=0;player.hurt(1);p.healed++;}}
       } else if(effType==='black'){
         // 黑色階梯：隨機變成任一顏色階梯（灰/白/綠/紅/紫/彩虹），各⅙機率
         if(isNew){
