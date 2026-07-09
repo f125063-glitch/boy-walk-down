@@ -3,6 +3,8 @@ import random
 import sys
 import math
 import numpy as np
+import json
+import os
 
 # Initialize Pygame
 pygame.init()
@@ -777,6 +779,24 @@ def draw_piano_score(surface, score_font, score_text, center_x, center_y,
     gloss_copy.set_alpha(int(90 * (body_alpha / 255.0)))
     surface.blit(gloss_copy, (text_rect.x, text_rect.y - 1))
 
+SCORES_FILE = "scores.json"
+
+def load_scores():
+    if os.path.exists(SCORES_FILE):
+        try:
+            with open(SCORES_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+def save_scores(scores):
+    try:
+        with open(SCORES_FILE, 'w', encoding='utf-8') as f:
+            json.dump(scores, f, ensure_ascii=False, indent=4)
+    except Exception as e:
+        print(f"Failed to save scores: {e}")
+
 def reset_game(game_mode="normal"):
     player = Player()
     if game_mode == "fly":
@@ -799,6 +819,18 @@ def reset_game(game_mode="normal"):
 def main():
     clock = pygame.time.Clock()
     state = "START"
+    
+    input_id_text = ""
+    prompt_record_index = 0
+    record_flow_state = "NONE"
+    prompt_delay_timer = 0.0
+    current_rank = -1
+    top_scores = []
+    
+    btn_record_yes = pygame.Rect(WIDTH // 2 - 100, HEIGHT // 2 + 50, 80, 50)
+    btn_record_no = pygame.Rect(WIDTH // 2 + 20, HEIGHT // 2 + 50, 80, 50)
+    btn_input_ok = pygame.Rect(WIDTH // 2 - 60, HEIGHT // 2 + 80, 120, 50)
+    btn_rank_ok = pygame.Rect(WIDTH // 2 - 60, HEIGHT - 100, 120, 50)
     
     player, platforms = reset_game("normal")
     frame_count = 0
@@ -855,7 +887,7 @@ def main():
                 elif player.score >= 201: bg_alpha = 229
                 elif player.score >= 101: bg_alpha = 216
                 _invert_bg.set_alpha(bg_alpha)
-                if state in ["START", "GAME_OVER"]:
+                if state == "START" or (state == "GAME_OVER" and record_flow_state == "NONE"):
                     bg_x = (bg_x - BG_SCROLL_SPEED) % WIDTH
                 blit_x = int(bg_x)
                 screen.blit(_invert_bg, (blit_x, 0))
@@ -871,7 +903,7 @@ def main():
                 elif player.score >= 101: bg_alpha = 216
                 bg_image.set_alpha(bg_alpha)
                 # Scroll background only on menu screens; freeze during gameplay
-                if state in ["START", "GAME_OVER"]:
+                if state == "START" or (state == "GAME_OVER" and record_flow_state == "NONE"):
                     bg_x = (bg_x - BG_SCROLL_SPEED) % WIDTH
                 blit_x = int(bg_x)
                 screen.blit(bg_image, (blit_x, 0))
@@ -887,8 +919,30 @@ def main():
                 if event.button == 1:
                     mouse_clicked = True
             if event.type == pygame.KEYDOWN:
+                if state == "GAME_OVER" and record_flow_state == "INPUT":
+                    if event.key == pygame.K_BACKSPACE:
+                        input_id_text = input_id_text[:-1]
+                    elif event.key == pygame.K_RETURN or event.key == pygame.K_KP_ENTER:
+                        if len(input_id_text) > 0:
+                            scores_list = load_scores()
+                            stars_count = game_rating.count("★")
+                            scores_list.append({"id": input_id_text, "score": player.score, "multiplier": starting_speed_multiplier, "stars": stars_count})
+                            scores_list = sorted(scores_list, key=lambda x: x["score"], reverse=True)
+                            save_scores(scores_list)
+                            # Find rank
+                            current_rank = -1
+                            for i, s in enumerate(scores_list):
+                                if s["id"] == input_id_text and s["score"] == player.score:
+                                    current_rank = i + 1
+                                    break
+                            top_scores = scores_list[:10]
+                            record_flow_state = "RANK"
+                    else:
+                        if len(input_id_text) < 16 and event.unicode.isprintable() and not event.unicode.isspace():
+                            input_id_text += event.unicode
+                    continue
                 if event.key == pygame.K_DOWN:
-                    if state in ["START", "GAME_OVER"]:
+                    if state == "START" or (state == "GAME_OVER" and record_flow_state == "NONE"):
                         selected_menu_index = (selected_menu_index + 1) % 2
                     elif state in ["PLAYING", "PAUSED"]:
                         if up_key_escape_count == 5:
@@ -914,7 +968,7 @@ def main():
                                     player.down_press_count = 0
                                     player.current_platform = None
                 elif event.key == pygame.K_UP:
-                    if state in ["START", "GAME_OVER"]:
+                    if state == "START" or (state == "GAME_OVER" and record_flow_state == "NONE"):
                         selected_menu_index = (selected_menu_index - 1) % 2
                     if state in ["PLAYING", "PAUSED"]:
                         if up_key_escape_count < 5:
@@ -922,6 +976,8 @@ def main():
                         else:
                             up_key_escape_count = 1
                 elif event.key == pygame.K_LEFT:
+                    if state == "GAME_OVER" and record_flow_state == "PROMPT":
+                        prompt_record_index = (prompt_record_index - 1) % 2
                     if state in ["PLAYING", "PAUSED"]:
                         up_key_escape_count = 0
                     if state in ["START", "GAME_OVER", "PAUSED"]:
@@ -932,9 +988,11 @@ def main():
                             idx = 1
                         idx = max(0, idx - 1)
                         speed_multiplier = speeds[idx]
-                        if state == "GAME_OVER":
+                        if state == "GAME_OVER" and record_flow_state == "NONE":
                             score_style_alt = True
                 elif event.key == pygame.K_RIGHT:
+                    if state == "GAME_OVER" and record_flow_state == "PROMPT":
+                        prompt_record_index = (prompt_record_index + 1) % 2
                     if state in ["PLAYING", "PAUSED"]:
                         up_key_escape_count = 0
                     if state in ["START", "GAME_OVER", "PAUSED"]:
@@ -945,10 +1003,17 @@ def main():
                             idx = 1
                         idx = min(len(speeds) - 1, idx + 1)
                         speed_multiplier = speeds[idx]
-                        if state == "GAME_OVER":
+                        if state == "GAME_OVER" and record_flow_state == "NONE":
                             score_style_alt = True
                 elif event.key == pygame.K_RETURN or event.key == pygame.K_KP_ENTER:
-                    if state == "START":
+                    if state == "GAME_OVER" and record_flow_state == "PROMPT":
+                        if prompt_record_index == 0:
+                            record_flow_state = "INPUT"
+                        else:
+                            record_flow_state = "NONE"
+                    elif state == "GAME_OVER" and record_flow_state == "RANK":
+                        record_flow_state = "NONE"
+                    elif state == "START":
                         state = "PLAYING"
                         starting_speed_multiplier = speed_multiplier
                         game_mode = "normal" if selected_menu_index == 0 else "fly"
@@ -958,7 +1023,7 @@ def main():
                         total_stairs_stepped = 0
                         btn_start.y = HEIGHT // 2 - 30
                         btn_fly.y = HEIGHT // 2 + 50
-                    elif state == "GAME_OVER":
+                    elif state == "GAME_OVER" and record_flow_state == "NONE":
                         if selected_menu_index == 0:
                             state = "PLAYING"
                             starting_speed_multiplier = speed_multiplier
@@ -1250,8 +1315,11 @@ def main():
                         game_rating = "★ 有進步"
                         
                     if player.score == 0:
-                        game_rating = "放鬆一下,再試一次"
+                        game_rating = "零分俱樂部,再試一次"
                     state = "GAME_OVER"
+                    record_flow_state = "WAIT_PROMPT"
+                    prompt_delay_timer = 1.0
+                    prompt_record_index = 0
                     selected_menu_index = 0
                     sfx_gameover.play()
 
@@ -1260,6 +1328,11 @@ def main():
                     spike_flash_timer += 1.0 / 60.0
                     if spike_flash_timer >= 0.2:
                         spike_flash_timer = 0.0
+
+        if state == "GAME_OVER" and record_flow_state == "WAIT_PROMPT":
+            prompt_delay_timer -= 1.0 / 60.0
+            if prompt_delay_timer <= 0:
+                record_flow_state = "PROMPT"
 
             # Calculate flash opacity
             spike_flash_alpha = 0
@@ -1381,9 +1454,9 @@ def main():
             btn_start.y = HEIGHT // 2 + 102
             btn_fly.y = HEIGHT // 2 + 182
 
-            if btn_start.collidepoint(mouse_pos):
+            if btn_start.collidepoint(mouse_pos) and record_flow_state == "NONE":
                 selected_menu_index = 0
-            elif btn_fly.collidepoint(mouse_pos):
+            elif btn_fly.collidepoint(mouse_pos) and record_flow_state == "NONE":
                 selected_menu_index = 1
 
             draw_top_spikes(screen, 0)
@@ -1404,14 +1477,14 @@ def main():
             draw_outlined_text("獲得評等: ", font_half_large_bold, score_body, screen, WIDTH // 2 + 20, HEIGHT // 2 + 45, HALF_SCORE_L1_OFFSETS, HALF_SCORE_L2_OFFSETS, outline_color1=score_out1, outline_color2=score_out2, align="right")
             draw_outlined_text(f"{display_rating}", font_half_large_bold, score_body, screen, WIDTH // 2 + 20, HEIGHT // 2 + 45, HALF_SCORE_L1_OFFSETS, HALF_SCORE_L2_OFFSETS, outline_color1=score_out1, outline_color2=score_out2, align="left")
 
-            pressed = btn_start.collidepoint(mouse_pos) and mouse_clicked
-            is_hover_start = btn_start.collidepoint(mouse_pos) or selected_menu_index == 0
+            pressed = btn_start.collidepoint(mouse_pos) and mouse_clicked and record_flow_state == "NONE"
+            is_hover_start = (btn_start.collidepoint(mouse_pos) or selected_menu_index == 0) and record_flow_state == "NONE"
             color = ((0, 0, 255), (128, 0, 255)) if is_hover_start else ((0, 0, 139), (128, 0, 128))
             current_font = font_medium_bold if selected_menu_index == 0 else font_medium
             draw_3d_button(screen, btn_start, color, "繼續挑戰", current_font, WHITE,
                            border_radius=15, pressed=pressed)
             
-            if mouse_clicked and btn_start.collidepoint(mouse_pos):
+            if mouse_clicked and btn_start.collidepoint(mouse_pos) and record_flow_state == "NONE":
                 state = "PLAYING"
                 starting_speed_multiplier = speed_multiplier
                 player, platforms = reset_game(game_mode)
@@ -1422,18 +1495,102 @@ def main():
                 btn_fly.y = HEIGHT // 2 + 50
                 mouse_clicked = False  # consume click
                 
-            fly_pressed = btn_fly.collidepoint(mouse_pos) and mouse_clicked
-            is_hover_fly = btn_fly.collidepoint(mouse_pos) or selected_menu_index == 1
+            fly_pressed = btn_fly.collidepoint(mouse_pos) and mouse_clicked and record_flow_state == "NONE"
+            is_hover_fly = (btn_fly.collidepoint(mouse_pos) or selected_menu_index == 1) and record_flow_state == "NONE"
             fly_color = ((0, 0, 255), (128, 0, 255)) if is_hover_fly else ((0, 0, 139), (128, 0, 128))
             current_font_fly = font_medium_bold if selected_menu_index == 1 else font_medium
             draw_3d_button(screen, btn_fly, fly_color, "回到首頁", current_font_fly, WHITE,
                            border_radius=15, pressed=fly_pressed)
             
-            if mouse_clicked and btn_fly.collidepoint(mouse_pos):
+            if mouse_clicked and btn_fly.collidepoint(mouse_pos) and record_flow_state == "NONE":
                 state = "START"
                 speed_multiplier = 1.0
                 selected_menu_index = 0
                 mouse_clicked = False  # consume click
+
+            # ---- OVERLAYS FOR RECORD FLOW ----
+            if record_flow_state == "PROMPT":
+                s = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+                s.fill((0, 0, 0, 200))
+                screen.blit(s, (0, 0))
+                
+                draw_text("是否記錄分數？", font_medium_bold, WHITE, screen, WIDTH // 2, HEIGHT // 2 - 50)
+                
+                yes_pressed = btn_record_yes.collidepoint(mouse_pos) and mouse_clicked
+                no_pressed = btn_record_no.collidepoint(mouse_pos) and mouse_clicked
+                
+                is_hover_yes = btn_record_yes.collidepoint(mouse_pos) or prompt_record_index == 0
+                is_hover_no = btn_record_no.collidepoint(mouse_pos) or prompt_record_index == 1
+                yes_color = ((0, 100, 0), (144, 238, 144)) if is_hover_yes else ((0, 50, 0), (100, 200, 100))
+                no_color = ((139, 0, 0), (255, 128, 128)) if is_hover_no else ((100, 0, 0), (200, 100, 100))
+                
+                draw_3d_button(screen, btn_record_yes, yes_color, "是", font_medium, WHITE, border_radius=10, pressed=yes_pressed)
+                draw_3d_button(screen, btn_record_no, no_color, "否", font_medium, WHITE, border_radius=10, pressed=no_pressed)
+                
+                if mouse_clicked:
+                    if btn_record_yes.collidepoint(mouse_pos):
+                        record_flow_state = "INPUT"
+                        mouse_clicked = False
+                    elif btn_record_no.collidepoint(mouse_pos):
+                        record_flow_state = "NONE"
+                        mouse_clicked = False
+
+            elif record_flow_state == "INPUT":
+                s = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+                s.fill((0, 0, 0, 200))
+                screen.blit(s, (0, 0))
+                
+                draw_text("請輸入ID (最多16字)", font_medium_bold, WHITE, screen, WIDTH // 2, HEIGHT // 2 - 80)
+                
+                input_box = pygame.Rect(WIDTH // 2 - 150, HEIGHT // 2 - 20, 300, 50)
+                pygame.draw.rect(screen, WHITE, input_box)
+                pygame.draw.rect(screen, (100, 100, 255), input_box, 3)
+                
+                draw_text(input_id_text, font_medium, BLACK, screen, WIDTH // 2, HEIGHT // 2 + 5)
+                
+                ok_pressed = btn_input_ok.collidepoint(mouse_pos) and mouse_clicked
+                draw_3d_button(screen, btn_input_ok, ((0, 0, 139), (128, 0, 128)), "確認", font_medium, WHITE, border_radius=10, pressed=ok_pressed)
+                
+                if mouse_clicked and btn_input_ok.collidepoint(mouse_pos):
+                    if len(input_id_text) > 0:
+                        scores_list = load_scores()
+                        stars_count = game_rating.count("★")
+                        scores_list.append({"id": input_id_text, "score": player.score, "multiplier": starting_speed_multiplier, "stars": stars_count})
+                        scores_list = sorted(scores_list, key=lambda x: x["score"], reverse=True)
+                        save_scores(scores_list)
+                        current_rank = -1
+                        for i, s_item in enumerate(scores_list):
+                            if s_item["id"] == input_id_text and s_item["score"] == player.score:
+                                current_rank = i + 1
+                                break
+                        top_scores = scores_list[:10]
+                        record_flow_state = "RANK"
+                        mouse_clicked = False
+
+            elif record_flow_state == "RANK":
+                s = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+                s.fill((0, 0, 0, 180))
+                screen.blit(s, (0, 0))
+                
+                draw_text(f"本次排名: 第 {current_rank} 名", font_medium_bold, KIDS_YELLOW, screen, WIDTH // 2, 40)
+                draw_text("--- TOP 10 ---", font_medium, WHITE, screen, WIDTH // 2, 90)
+                
+                y_offset = 130
+                colors = [GOLDEN, (211, 211, 211), (205, 127, 50)]  # Gold, Silver, Bronze
+                for i, score_data in enumerate(top_scores):
+                    color = colors[i] if i < len(colors) else WHITE
+                    m = score_data.get('multiplier', 1.0)
+                    s_star = score_data.get('stars', 0)
+                    text_str = f"TOP.{i+1} {score_data['id']} 分數: {score_data['score']} 倍數: {m} 星數: {s_star}"
+                    draw_text(text_str, font_small, color, screen, WIDTH // 2, y_offset)
+                    y_offset += 32
+                    
+                ok_pressed = btn_rank_ok.collidepoint(mouse_pos) and mouse_clicked
+                draw_3d_button(screen, btn_rank_ok, ((0, 0, 139), (128, 0, 128)), "繼續 (Enter)", font_medium, WHITE, border_radius=10, pressed=ok_pressed)
+                
+                if mouse_clicked and btn_rank_ok.collidepoint(mouse_pos):
+                    record_flow_state = "NONE"
+                    mouse_clicked = False
  
         # ---- Top Bar UI (Always visible) ----
         # Pause Button
@@ -1467,7 +1624,7 @@ def main():
             speed_multiplier = 1.0
  
         # Speed Buttons — only available in START, GAME_OVER
-        if state in ["START", "GAME_OVER"]:
+        if state == "START" or (state == "GAME_OVER" and record_flow_state == "NONE"):
             for btn, mult, text in [(btn_speed_050, 0.5, "0.5倍"), (btn_speed_100, 1.0, "1.0倍"), (btn_speed_150, 1.5, "1.5倍")]:
                 is_selected = (speed_multiplier == mult)
                 sp_pressed = btn.collidepoint(mouse_pos) and mouse_clicked
@@ -1484,7 +1641,7 @@ def main():
                 
                 if mouse_clicked and btn.collidepoint(mouse_pos):
                     speed_multiplier = mult
-                    if state == "GAME_OVER":
+                    if state == "GAME_OVER" and record_flow_state == "NONE":
                         score_style_alt = True
         elif state in ["PLAYING", "PAUSED"]:
             font_bold_small = pygame.font.SysFont("microsoftjhenghei", 16, bold=True)
