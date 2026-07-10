@@ -190,11 +190,17 @@
   </div>
 
   <div id="score-rank-overlay" class="score-overlay" style="align-items: flex-start; justify-content: center; padding-top: 30px;">
-    <div class="dialog-card" id="score-rank-card" style="max-height: 80vh; overflow-y: auto;">
-      <div class="dialog-title" style="color: #ffb703" id="score-rank-title">本次排名: </div>
-      <div id="score-rank-list" style="margin-bottom: 20px; font-size: 14px; line-height: 2.0; text-align: left; padding-left: 20px; white-space: nowrap; overflow-x: auto; padding-bottom: 10px;">
+    <div class="dialog-card" id="score-rank-card" style="max-height: 80vh; display: flex; flex-direction: column; overflow: hidden;">
+      <div class="dialog-title" style="color: #ffffff; flex-shrink: 0; font-weight: bold;
+           text-shadow:
+             0 0 2px #000, 1px 0 2px #000, -1px 0 2px #000, 0 1px 2px #000, 0 -1px 2px #000,
+             1px 1px 2px #000, -1px 1px 2px #000, 1px -1px 2px #000, -1px -1px 2px #000,
+             0 0 5px #fff, 2px 0 5px #fff, -2px 0 5px #fff, 0 2px 5px #fff, 0 -2px 5px #fff,
+             2px 2px 5px #fff, -2px 2px 5px #fff, 2px -2px 5px #fff, -2px -2px 5px #fff;"
+           id="score-rank-title">本次排名: </div>
+      <div id="score-rank-list" style="flex: 1; overflow-y: auto; overflow-x: auto; font-size: 14px; line-height: 2.0; text-align: left; padding-left: 20px; white-space: nowrap; padding-bottom: 10px; margin-bottom: 0;">
       </div>
-      <div class="dialog-buttons">
+      <div class="dialog-buttons" style="flex-shrink: 0; margin-top: 12px;">
         <button id="score-rank-continue" class="dialog-btn btn-confirm">繼續</button>
       </div>
     </div>
@@ -998,18 +1004,21 @@ window.addEventListener('keydown',e=>{
     }
   }
 
-  if(['START','GAME_OVER'].includes(state)){
+  if(state==='START'){
+    if(e.key==='ArrowUp')   selIdx=(selIdx-1+2)%2;
+    if(e.key==='ArrowDown') selIdx=(selIdx+1)%2;
+    if(e.key==='Enter'||e.key==='NumpadEnter') startGame(selIdx===0?'normal':'fly');
+    if(e.key==='ArrowLeft') {const sp=[.5,1,1.5];let i=sp.indexOf(speedMult);if(i<0)i=1;speedMult=sp[Math.max(0,i-1)];}
+    if(e.key==='ArrowRight'){const sp=[.5,1,1.5];let i=sp.indexOf(speedMult);if(i<0)i=1;speedMult=sp[Math.min(2,i+1)];}
+  }
+  if(state==='GAME_OVER' && recordFlowState==='NONE'){
     if(e.key==='ArrowUp')   selIdx=(selIdx-1+2)%2;
     if(e.key==='ArrowDown') selIdx=(selIdx+1)%2;
     if(e.key==='Enter'||e.key==='NumpadEnter'){
-      if(state==='GAME_OVER') {
-        if (selIdx===1) {
-          state='START';speedMult=1;selIdx=0;btnSY=GH/2-30;btnFY=GH/2+50;
-        } else {
-          startGame(gameMode);
-        }
+      if(selIdx===1){
+        state='START';speedMult=1;selIdx=0;btnSY=GH/2-30;btnFY=GH/2+50;
       } else {
-        startGame(selIdx===0?'normal':'fly');
+        startGame(gameMode);
       }
     }
     if(e.key==='ArrowLeft') {const sp=[.5,1,1.5];let i=sp.indexOf(speedMult);if(i<0)i=1;speedMult=sp[Math.max(0,i-1)];}
@@ -1077,7 +1086,13 @@ const touchPressedDirs = new Set();
   const on=ev=>{
     if(isTimeRestricted)return;
     ev.preventDefault();
-    if(['START','GAME_OVER'].includes(state)){
+    if(state==='START'){
+      if(dir==='up') selIdx=(selIdx-1+2)%2;
+      if(dir==='down') selIdx=(selIdx+1)%2;
+      if(dir==='left') {const sp=[.5,1,1.5];let i=sp.indexOf(speedMult);if(i<0)i=1;speedMult=sp[Math.max(0,i-1)];}
+      if(dir==='right'){const sp=[.5,1,1.5];let i=sp.indexOf(speedMult);if(i<0)i=1;speedMult=sp[Math.min(2,i+1)];}
+    }
+    if(state==='GAME_OVER' && recordFlowState==='NONE'){
       if(dir==='up') selIdx=(selIdx-1+2)%2;
       if(dir==='down') selIdx=(selIdx+1)%2;
       if(dir==='left') {const sp=[.5,1,1.5];let i=sp.indexOf(speedMult);if(i<0)i=1;speedMult=sp[Math.max(0,i-1)];}
@@ -1310,7 +1325,7 @@ function updateGame(){
         updatePromptRecordUI();
         document.getElementById('score-prompt-overlay').style.display = 'flex';
       }
-    }, 1000);
+    }, 500);
     selIdx=0;btnSY=GH/2+140;btnFY=GH/2+215;playBuf(SFX.gameover);
   }
 
@@ -1687,13 +1702,13 @@ document.getElementById('score-input-confirm').addEventListener('click', () => {
   document.getElementById('score-rank-title').innerText = "本次排名: 第 " + rank + " 名";
   let listHtml = "";
   for(let i=0; i<Math.min(20, scores.length); i++) {
-    let color = i===0 ? "#FFD700" : (i===1 ? "#C0C0C0" : (i===2 ? "#CD7F32" : "#FFF"));
-    let fontWeight = i < 3 ? "font-weight: bold;" : "";
     let m = scores[i].multiplier !== undefined ? scores[i].multiplier : 1.0;
     let s = scores[i].stars !== undefined ? scores[i].stars : 0;
     let isCurrent = (rank > 0 && i === rank - 1);
+    let color = isCurrent ? "#FF4444" : "#FFF";
+    let fontWeight = (isCurrent || i < 3) ? "font-weight: bold;" : "";
     let rowClass = isCurrent ? "class='record-glow'" : "";
-    listHtml += `<div ${rowClass} style="color: ${color}; font-size: 13px; ${fontWeight}; margin: 2px 0;">Top.${i+1} - 名字: ${scores[i].id} / 分數: ${scores[i].score} / 倍數: ${m} / 星數: ${s}</div>`;
+    listHtml += `<div ${rowClass} style="color: ${color}; font-size: 13px; ${fontWeight} margin: 2px 0;">Top.${i+1} - 名字: ${scores[i].id} / 分數: ${scores[i].score} / 倍數: ${m} / 星數: ${s}</div>`;
   }
   document.getElementById('score-rank-list').innerHTML = listHtml;
   document.getElementById('score-rank-overlay').style.display = 'flex';

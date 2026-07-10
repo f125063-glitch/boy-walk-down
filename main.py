@@ -1318,7 +1318,7 @@ def main():
                         game_rating = "零分俱樂部,再試一次"
                     state = "GAME_OVER"
                     record_flow_state = "WAIT_PROMPT"
-                    prompt_delay_timer = 1.0
+                    prompt_delay_timer = 0.5
                     prompt_record_index = 0
                     selected_menu_index = 0
                     sfx_gameover.play()
