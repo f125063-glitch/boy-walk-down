@@ -1511,7 +1511,7 @@ def main():
             # ---- OVERLAYS FOR RECORD FLOW ----
             if record_flow_state == "PROMPT":
                 s = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-                s.fill((0, 0, 0, 200))
+                s.fill((0, 0, 0, 13))
                 screen.blit(s, (0, 0))
                 
                 draw_text("是否記錄分數？", font_medium_bold, WHITE, screen, WIDTH // 2, HEIGHT // 2 - 50)
@@ -1537,7 +1537,7 @@ def main():
 
             elif record_flow_state == "INPUT":
                 s = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-                s.fill((0, 0, 0, 200))
+                s.fill((0, 0, 0, 13))
                 screen.blit(s, (0, 0))
                 
                 draw_text("請輸入ID (最多16字)", font_medium_bold, WHITE, screen, WIDTH // 2, HEIGHT // 2 - 80)
@@ -1569,7 +1569,7 @@ def main():
 
             elif record_flow_state == "RANK":
                 s = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-                s.fill((0, 0, 0, 180))
+                s.fill((0, 0, 0, 13))
                 screen.blit(s, (0, 0))
                 
                 draw_text(f"本次排名: 第 {current_rank} 名", font_medium_bold, KIDS_YELLOW, screen, WIDTH // 2, 40)
@@ -1578,7 +1578,17 @@ def main():
                 y_offset = 130
                 colors = [GOLDEN, (211, 211, 211), (205, 127, 50)]  # Gold, Silver, Bronze
                 for i, score_data in enumerate(top_scores):
-                    color = colors[i] if i < len(colors) else WHITE
+                    base_color = colors[i] if i < len(colors) else WHITE
+                    if current_rank > 0 and i == current_rank - 1:
+                        t = pygame.time.get_ticks() / 150.0
+                        pulse = (math.sin(t) + 1) / 2.0
+                        color = (
+                            int(base_color[0] + (255 - base_color[0]) * pulse),
+                            int(base_color[1] + (255 - base_color[1]) * pulse),
+                            int(base_color[2] + (255 - base_color[2]) * pulse)
+                        )
+                    else:
+                        color = base_color
                     m = score_data.get('multiplier', 1.0)
                     s_star = score_data.get('stars', 0)
                     text_str = f"TOP.{i+1} {score_data['id']} 分數: {score_data['score']} 倍數: {m} 星數: {s_star}"
