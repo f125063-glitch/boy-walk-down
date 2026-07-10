@@ -1540,7 +1540,7 @@ def main():
                 s.fill((0, 0, 0, 13))
                 screen.blit(s, (0, 0))
                 
-                draw_text("請輸入ID (最多16字)", font_medium_bold, WHITE, screen, WIDTH // 2, HEIGHT // 2 - 80)
+                draw_text("請輸入ID", font_medium_bold, WHITE, screen, WIDTH // 2, HEIGHT // 2 - 80)
                 
                 input_box = pygame.Rect(WIDTH // 2 - 150, HEIGHT // 2 - 20, 300, 50)
                 pygame.draw.rect(screen, WHITE, input_box)
