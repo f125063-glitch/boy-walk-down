@@ -55,12 +55,27 @@
       animation: flash-white 0.2s ease-out;
     }
 
-    @keyframes text-glow-pulse {
-      0%, 100% { text-shadow: 0 0 2px currentColor; opacity: 0.8; filter: brightness(1); }
-      50%      { text-shadow: 0 0 8px currentColor, 0 0 15px currentColor; opacity: 1; filter: brightness(1.3); }
+    @keyframes red-yellow-gradient {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    @keyframes text-size-pulse {
+      0%, 100% { font-size: 13px; }
+      50%      { font-size: 16px; }
     }
     .record-glow {
-      animation: text-glow-pulse 0.8s ease-in-out infinite;
+      background: linear-gradient(90deg, #ff3333, #ffff33, #ff3333, #ffff33);
+      background-size: 300% 300%;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      color: transparent !important;
+      animation: red-yellow-gradient 1.5s ease infinite, text-size-pulse 1.5s ease-in-out infinite;
+      font-weight: bold;
+      filter: drop-shadow(0 0 5px rgba(255, 100, 0, 0.8));
+      width: max-content;
+      display: inline-block;
     }
 
 
@@ -1705,13 +1720,21 @@ document.getElementById('score-input-confirm').addEventListener('click', () => {
     let m = scores[i].multiplier !== undefined ? scores[i].multiplier : 1.0;
     let s = scores[i].stars !== undefined ? scores[i].stars : 0;
     let isCurrent = (rank > 0 && i === rank - 1);
-    let color = isCurrent ? "#FF4444" : "#FFF";
+    let colorStyle = isCurrent ? "" : "color: #FFF;";
+    let fontSizeStyle = isCurrent ? "" : "font-size: 13px;";
+    let idAttr = isCurrent ? "id='current-record-item'" : "";
     let fontWeight = (isCurrent || i < 3) ? "font-weight: bold;" : "";
     let rowClass = isCurrent ? "class='record-glow'" : "";
-    listHtml += `<div ${rowClass} style="color: ${color}; font-size: 13px; ${fontWeight} margin: 2px 0;">Top.${i+1} - 名字: ${scores[i].id} / 分數: ${scores[i].score} / 倍數: ${m} / 星數: ${s}</div>`;
+    listHtml += `<div ${idAttr} ${rowClass} style="${colorStyle} ${fontSizeStyle} ${fontWeight} margin: 2px 0; width: max-content; padding-right: 20px;">Top.${i+1} - 名字: ${scores[i].id} / 分數: ${scores[i].score} / 倍數: ${m} / 星數: ${s}</div>`;
   }
   document.getElementById('score-rank-list').innerHTML = listHtml;
   document.getElementById('score-rank-overlay').style.display = 'flex';
+  const currentItem = document.getElementById('current-record-item');
+  if (currentItem) {
+    setTimeout(() => {
+      currentItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+  }
 });
 
 document.getElementById('score-input-text').addEventListener('keydown', (e) => {
