@@ -1475,7 +1475,7 @@ function drawFrame(){
     const ta=((Date.now()%2000)/2000)*(242/255);
     drawOutlined('球球大冒險',F_LG,'#000',GW/2,GH/3,4,9,'#fff','#000',ta);
     if(mInR([GW/2-80,btnSY,160,60]))selIdx=0; if(mInR([GW/2-80,btnFY,160,60]))selIdx=1;
-    drawBtn(GW/2-80,btnSY,160,60,[[139,0,0],[255,102,102]],'開始遊戲',selIdx===0?F_MED_B:F_MED,'#fff',15);
+    drawBtn(GW/2-80,btnSY,160,60,[[139,0,0],[255,102,102]],'開始挑戰',selIdx===0?F_MED_B:F_MED,'#fff',15);
     drawBtn(GW/2-80,btnFY,160,60,[[0,100,0],[144,238,144]],'飛高高吧',selIdx===1?F_MED_B:F_MED,'#fff',15);
     drawTopBarUI();
 
@@ -1669,16 +1669,19 @@ function updatePromptRecordUI() {
   }
 }
 
+function getScoresKey() {
+  return gameMode === 'fly' ? 'boy_walk_down_scores_fly' : 'boy_walk_down_scores';
+}
 function loadScores() {
   try {
-    const data = localStorage.getItem('boy_walk_down_scores');
+    const data = localStorage.getItem(getScoresKey());
     if (data) return JSON.parse(data);
   } catch(e) {}
   return [];
 }
 function saveScores(scores) {
   try {
-    localStorage.setItem('boy_walk_down_scores', JSON.stringify(scores));
+    localStorage.setItem(getScoresKey(), JSON.stringify(scores));
   } catch(e) {}
 }
 
@@ -1716,7 +1719,8 @@ document.getElementById('score-input-confirm').addEventListener('click', () => {
   document.getElementById('score-input-overlay').style.display = 'none';
   recordFlowState = 'RANK';
   
-  document.getElementById('score-rank-title').innerText = "本次排名: 第 " + rank + " 名";
+  const modeLabel = gameMode === 'fly' ? '【飛高高吧】' : '【開始挑戰】';
+  document.getElementById('score-rank-title').innerText = modeLabel + " 本次排名: 第 " + rank + " 名";
   let listHtml = "";
   for(let i=0; i<Math.min(20, scores.length); i++) {
     let m = scores[i].multiplier !== undefined ? scores[i].multiplier : 1.0;
