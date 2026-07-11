@@ -963,7 +963,7 @@ def main():
                                 if player.down_press_count >= 2:
                                     # Penetrate!
                                     player.rect.y += 25
-                                    if player.invert_timer <= 0 and player.current_platform.type == "normal":
+                                    if player.invert_timer <= 0 and player.current_platform.type == "normal" and game_mode != "fly":
                                         player.modify_health(-1)
                                     player.down_press_count = 0
                                     player.current_platform = None
@@ -1173,7 +1173,7 @@ def main():
                                     p.healed_amount += 1
                         elif eff_type == "fade":
                             if is_new_landing:
-                                if player.invert_timer <= 0:
+                                if player.invert_timer <= 0 and game_mode != "fly":
                                     player.modify_health(-1)
                                 if player.rainbow_mode:
                                     player.rainbow_mode = False
@@ -1555,12 +1555,13 @@ def main():
                     if len(input_id_text) > 0:
                         scores_list = load_scores()
                         stars_count = game_rating.count("★")
-                        scores_list.append({"id": input_id_text, "score": player.score, "multiplier": starting_speed_multiplier, "stars": stars_count})
-                        scores_list = sorted(scores_list, key=lambda x: x["score"], reverse=True)
+                        weighted = round(player.score * starting_speed_multiplier, 1)
+                        scores_list.append({"id": input_id_text, "score": player.score, "multiplier": starting_speed_multiplier, "stars": stars_count, "weighted_score": weighted})
+                        scores_list = sorted(scores_list, key=lambda x: x.get("weighted_score", x["score"]), reverse=True)
                         save_scores(scores_list)
                         current_rank = -1
                         for i, s_item in enumerate(scores_list):
-                            if s_item["id"] == input_id_text and s_item["score"] == player.score:
+                            if s_item["id"] == input_id_text and s_item.get("weighted_score", s_item["score"]) == weighted:
                                 current_rank = i + 1
                                 break
                         top_scores = scores_list[:10]
@@ -1572,7 +1573,10 @@ def main():
                 s.fill((0, 0, 0, 13))
                 screen.blit(s, (0, 0))
                 
-                draw_text(f"本次排名: 第 {current_rank} 名", font_medium_bold, KIDS_YELLOW, screen, WIDTH // 2, 40)
+                if game_mode == "fly":
+                    draw_text(f"本次排名: 第 {current_rank} 名", font_medium_bold, KIDS_LIGHT_GREEN, screen, WIDTH // 2, 40)
+                else:
+                    draw_text(f"本次排名: 第 {current_rank} 名", font_medium_bold, KIDS_ORANGE, screen, WIDTH // 2, 40)
                 draw_text("--- TOP 10 ---", font_medium, WHITE, screen, WIDTH // 2, 90)
                 
                 y_offset = 130
@@ -1591,7 +1595,8 @@ def main():
                         color = base_color
                     m = score_data.get('multiplier', 1.0)
                     s_star = score_data.get('stars', 0)
-                    text_str = f"TOP.{i+1} {score_data['id']} 分數: {score_data['score']} 倍數: {m} 星數: {s_star}"
+                    ws = score_data.get('weighted_score', round(score_data['score'] * m, 1))
+                    text_str = f"TOP.{i+1} {score_data['id']}  評等:{ws}  原始:{score_data['score']}  倍速:{m}x  星:{s_star}"
                     draw_text(text_str, font_small, color, screen, WIDTH // 2, y_offset)
                     y_offset += 32
                     
