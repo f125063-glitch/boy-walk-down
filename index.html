@@ -71,9 +71,9 @@
       -webkit-text-fill-color: transparent;
       background-clip: text;
       color: transparent !important;
-      animation: red-yellow-gradient 1.5s ease infinite, text-size-pulse 1.5s ease-in-out infinite;
+      animation: red-yellow-gradient 1.5s ease infinite;
       font-weight: bold;
-      font-size: 13px;
+      font-size: 16px;
       filter: drop-shadow(0 0 5px rgba(255, 100, 0, 0.8));
       width: max-content;
       display: inline-block;
@@ -1688,7 +1688,9 @@ function showTop20(mode) {
   gameMode = prevMode;
 
   const modeLabel = mode === 'fly' ? '【飛高高吧】' : '【開始挑戰】';
-  document.getElementById('score-rank-title').innerText = modeLabel + " 本次排名: ---";
+  const titleEl = document.getElementById('score-rank-title');
+  titleEl.innerText = "本次排名: ---";
+  titleEl.style.color = mode === 'fly' ? "#99ff99" : "#ff9999";
   let listHtml = "";
   for(let i=0; i<Math.min(20, scores.length); i++) {
     let m = scores[i].multiplier !== undefined ? scores[i].multiplier : 1.0;
@@ -1754,7 +1756,9 @@ document.getElementById('score-input-confirm').addEventListener('click', () => {
   recordFlowState = 'RANK';
   
   const modeLabel = gameMode === 'fly' ? '【飛高高吧】' : '【開始挑戰】';
-  document.getElementById('score-rank-title').innerText = modeLabel + " 本次排名: 第 " + rank + " 名";
+  const titleEl = document.getElementById('score-rank-title');
+  titleEl.innerText = "本次排名: 第 " + rank + " 名";
+  titleEl.style.color = gameMode === 'fly' ? "#99ff99" : "#ff9999";
   let listHtml = "";
   for(let i=0; i<Math.min(20, scores.length); i++) {
     let m = scores[i].multiplier !== undefined ? scores[i].multiplier : 1.0;
