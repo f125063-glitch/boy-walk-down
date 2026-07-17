@@ -426,9 +426,86 @@ function initSounds(){
     let ph=0;
     for(let i=0;i<half;i++){const t=i/sr;ph+=2*Math.PI*1200/sr;d[i]=Math.sin(ph)*Math.exp(-t*60)*0.55;}
     // 「答」: 900Hz 後半段
-    ph=0;
+ph=0;
     for(let i=half;i<n;i++){const t=(i-half)/sr;ph+=2*Math.PI*900/sr;d[i]=Math.sin(ph)*Math.exp(-t*60)*0.40;}
   },0.08);
+}
+
+let sessionBGM = {};
+let currentBgmFolder = '';
+let currentBgmAudio = null;
+
+async function playRandomBGM(folderPath) {
+  if (currentBgmFolder === folderPath) return; 
+  currentBgmFolder = folderPath;
+  if (currentBgmAudio) { currentBgmAudio.pause(); currentBgmAudio = null; }
+  if (!folderPath) return;
+
+  if (sessionBGM[folderPath]) {
+    const audio = new Audio(sessionBGM[folderPath]);
+    audio.loop = true;
+    audio.play().catch(e => {});
+    currentBgmAudio = audio;
+    return;
+  }
+
+  let files = [];
+  try {
+    const response = await fetch(folderPath + '/');
+    if (response.ok) {
+      const text = await response.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(text, 'text/html');
+      files = Array.from(doc.querySelectorAll('a')).map(a => a.getAttribute('href')).filter(href => href && href.match(/\.(mp3|wav|ogg|m4a|aac|flac)$/i));
+    }
+  } catch (e) {}
+
+  if (files.length > 0) {
+    const randomFile = files[Math.floor(Math.random() * files.length)];
+    const audioUrl = (randomFile.startsWith('http') || randomFile.startsWith('/')) ? randomFile : folderPath + '/' + randomFile;
+    if (currentBgmFolder !== folderPath) return;
+    sessionBGM[folderPath] = audioUrl;
+    const audio = new Audio(audioUrl);
+    audio.loop = true;
+    audio.play().catch(e => {});
+    currentBgmAudio = audio;
+  } else {
+    let attempts = [1,2,3,4,5,6,7,8,9,10];
+    attempts.sort(() => Math.random() - 0.5);
+    const tryNext = () => {
+      if (attempts.length === 0 || currentBgmFolder !== folderPath) return;
+      const idx = attempts.pop();
+      const audioUrl = `${folderPath}/${idx}.mp3`;
+      const audio = new Audio(audioUrl);
+      audio.loop = true;
+      audio.oncanplay = () => {
+        if (currentBgmFolder !== folderPath) return;
+        sessionBGM[folderPath] = audioUrl;
+        audio.play().catch(e => {});
+        currentBgmAudio = audio;
+      };
+      audio.onerror = () => { tryNext(); };
+    };
+    tryNext();
+  }
+}
+
+function updateBGM() {
+  let targetFolder = '';
+  if (state === 'START') targetFolder = 'BGM1';
+  else if (state === 'GAME_OVER') targetFolder = 'BGM4';
+  else if (state === 'PLAYING' || state === 'PAUSED') {
+    if (gameMode === 'fly') {
+      targetFolder = 'BGM3';
+    } else {
+      targetFolder = (player && player.isBonusBgm) ? 'BGM3' : 'BGM2';
+    }
+  }
+  if (currentBgmFolder !== targetFolder) playRandomBGM(targetFolder);
+}
+
+function tryResumeBGM() {
+  if (currentBgmAudio && currentBgmAudio.paused) currentBgmAudio.play().catch(e => {});
 }
 
 /* ═══════════════════════ UTILITIES ═══════════════════════ */
@@ -589,12 +666,12 @@ function drawStarRating(cx, cy, rating, alpha=1) {
 
 /* Piano lacquer score text (red body + gloss) */
 // blackMode: 字本體黑色、第二層外框也為黑色（用於額外加分倒數計時）
-function drawScoreTxt(text,font,cx,cy,l1w,l2w,oA=1,fly=false,bA=1,blackMode=false){
+function drawScoreTxt(text,font,cx,cy,l1w,l2w,oA=1,fly=false,bA=1,blackMode=false,align='center'){
   const bc=blackMode?'rgb(0,0,0)':fly?'rgb(0,100,0)':'rgb(210,20,20)';
   const gc=blackMode?`rgba(60,60,60,${0.35*bA})`:fly?`rgba(140,255,140,${0.35*bA})`:`rgba(255,140,140,${0.35*bA})`;
   const outline2=blackMode?'#000':'#000'; // 第二層外框（blackMode 同樣為黑色）
   ctx.save();
-  ctx.font=font; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.lineJoin='round';
+  ctx.font=font; ctx.textAlign=align; ctx.textBaseline='middle'; ctx.lineJoin='round';
   ctx.globalAlpha=oA;
   ctx.strokeStyle=outline2; ctx.lineWidth=l2w; ctx.strokeText(text,cx,cy);
   ctx.strokeStyle='#fff'; ctx.lineWidth=l1w; ctx.strokeText(text,cx,cy);
@@ -660,7 +737,7 @@ class Player{
     this.flyMode=false; this.flyUpCnt=0;
     this.flashT=0; this.flashType='';
     this.hist=[]; this.upHist=[];
-    this.healLand=0; this.normLand=0; this.combo=0;
+    this.healLand=0; this.normLand=0; this._combo=0; this.maxCombo=0;
     this.rainbow=false; this.rainbowT=0; this.rainbowOutT=0; this.scoreMult=1; this.extraT=999;
     this.hitSpike=false; this.onSpikeP=false;
     this.lastPlat=null; this.curPlat=null;
@@ -672,8 +749,14 @@ class Player{
     this.speedTimer = 0;
     this.hasAchievedSinceDamage = false;
   }
+  get combo() { return this._combo; }
+  set combo(v) {
+    this._combo = v;
+    if (v > this.maxCombo) this.maxCombo = v;
+  }
   triggerExtraBonus(){
     if(this.invertTimer <= 0) {
+      this.isBonusBgm = true;
       this.invertTimer = 10;
       if(!this.hasAchievedSinceDamage){
         this.speedTimer = 10;
@@ -692,13 +775,15 @@ class Player{
   hurt(amt){
     this.hp=Math.max(0,Math.min(this.maxHp,this.hp+amt));
     if(amt<0){
+      this.isBonusBgm = false;
       this.hasAchievedSinceDamage = false;
       this.healSupp=false; this.flashT=30; this.flashType='DEC';
       playBuf(SFX.damage); this.flyUpCnt=0;
-      if(this.rainbow&&!this.flyMode){this.rainbow=false;this.combo=0;this.scoreMult=1;this.rainbowOutT=0;}
+      if(this.rainbow&&!this.flyMode){this.rainbow=false;this.scoreMult=1;this.rainbowOutT=0;}
       this.invertTimer = 0;
       this.speedTimer = 0;
       this.rainbowSafeCombo=0; // damage resets the rainbow safe combo
+      this.combo=0;
     } else if(amt>0){
       if(this.flyMode&&this.hp>=this.maxHp)this.healSupp=true;
       if(!this.healSupp){this.flashT=30;this.flashType='INC';playBuf(SFX.heal);}
@@ -895,7 +980,7 @@ class Platform{
 /* ═══════════════════════ GAME STATE ═══════════════════════ */
 let state='START', player, platforms=[];
 let frameCount=0, speedMult=1, startingSpeedMult=1, spikeFlash=0, gameMode='normal', scoreStyleAlt=false;
-let selIdx=0, escCnt=0, rightArrowCount=0;
+let selIdx=0, escCnt=0, rightArrowCount=0, leftArrowCount=0;
 let btnSY=GH/2-30, btnFY=GH/2+50; // Y-pos for start / fly buttons (shift in GAME_OVER)
 let gameStartTime=0, totalStairs=0, gameRating=1;
 
@@ -916,13 +1001,16 @@ function resetGame(mode){
   const p=new Platform(GW/2-50,GH-100,'normal');p.stepped=true;platforms=[p];
   player.bottom=p.top; player.x=p.x+p.w/2-player.w/2;
   player.velY=0; player.curPlat=p; player.lastPlat=p;
+  updateBGM();
 }
 
 function startGame(mode){
   initSounds(); if(AC?.state==='suspended')AC.resume();
+  sessionBGM = {};
   resetGame(mode); state='PLAYING'; btnSY=GH/2-30; btnFY=GH/2+50; escCnt=0; frameCount=0; scoreStyleAlt=false;
   startingSpeedMult = speedMult;
   gameStartTime=Date.now(); totalStairs=0;
+  updateBGM();
 }
 
 /* ═══════════════════════ INPUT ═══════════════════════ */
@@ -954,6 +1042,7 @@ canvas.addEventListener('pointermove',e=>{
 });
 canvas.addEventListener('pointerdown',e=>{
   initSounds();if(AC?.state==='suspended')AC.resume();
+  tryResumeBGM();
   const rc=canvas.getBoundingClientRect();
   const mx=(e.clientX-rc.left)/CS, my=(e.clientY-rc.top)/CS;
   if(useGesture && state === 'PLAYING') {
@@ -983,7 +1072,7 @@ function handleClick(mx,my){
     if(inXYWH(mx,my,GW/2-80,btnSY,160,60)){startGame(state==='GAME_OVER'?gameMode:'normal');return;}
     if(inXYWH(mx,my,GW/2-80,btnFY,160,60)){
       if(state==='GAME_OVER') {
-        state='START';speedMult=1;selIdx=0;btnSY=GH/2-30;btnFY=GH/2+50;
+        state='START';speedMult=1;selIdx=0;btnSY=GH/2-30;btnFY=GH/2+50;updateBGM();
       } else {
         startGame('fly');
       }
@@ -993,8 +1082,8 @@ function handleClick(mx,my){
     if(inR(mx,my,BGESTURE)){useGesture=!useGesture;resize();return;}
   }
   if(state==='PLAYING'||state==='PAUSED'){
-    if(inR(mx,my,BP)){state=state==='PAUSED'?'PLAYING':'PAUSED';return;}
-    if(inR(mx,my,BS)){state='START';speedMult=1;btnSY=GH/2-30;btnFY=GH/2+50;return;}
+    if(inR(mx,my,BP)){state=state==='PAUSED'?'PLAYING':'PAUSED';updateBGM();return;}
+    if(inR(mx,my,BS)){state='START';speedMult=1;btnSY=GH/2-30;btnFY=GH/2+50;updateBGM();return;}
   }
   if(['START','GAME_OVER','PAUSED'].includes(state)){
     if(inR(mx,my,B05)){speedMult=0.5;if(state==='GAME_OVER')scoreStyleAlt=true;return;}
@@ -1015,6 +1104,31 @@ function triggerFlash(dir) {
 
 window.addEventListener('keydown',e=>{
   if(isTimeRestricted)return;
+  tryResumeBGM();
+
+  if (state === 'GAME_OVER' && recordFlowState !== 'NONE') {
+    if (recordFlowState === 'PROMPT') {
+      if (e.key === 'ArrowLeft' || e.key === 'a') { promptRecordIndex = 0; updatePromptRecordUI(); }
+      if (e.key === 'ArrowRight' || e.key === 'd') { promptRecordIndex = 1; updatePromptRecordUI(); }
+      if (e.key === 'Enter' || e.key === 'NumpadEnter') {
+        if (promptRecordIndex === 0) document.getElementById('score-prompt-yes').click();
+        else document.getElementById('score-prompt-no').click();
+      }
+    } else if (recordFlowState === 'INPUT') {
+      if (e.key === 'Enter' || e.key === 'NumpadEnter') {
+        const btn = document.getElementById('score-input-confirm');
+        if (btn) btn.click();
+      }
+    } else if (recordFlowState === 'RANK') {
+      if (e.key === 'Enter' || e.key === 'NumpadEnter' || e.key === 'Escape') {
+        const closeBtn = document.getElementById('score-rank-close');
+        if (closeBtn) closeBtn.click();
+      }
+    }
+    return;
+  }
+
+  if(recordFlowState!=='NONE')return;
   let pressedKey = null;
   if(e.key==='ArrowLeft' ||e.key==='a') { if(!keys.left) { keys.left=true; pressedKey='left'; } }
   if(e.key==='ArrowRight'||e.key==='d') { if(!keys.right){ keys.right=true; pressedKey='right'; } }
@@ -1027,38 +1141,31 @@ window.addEventListener('keydown',e=>{
     if(btn) btn.classList.add('pressed');
   }
 
-  if (state === 'GAME_OVER' && recordFlowState !== 'NONE') {
-    if (recordFlowState === 'PROMPT') {
-      if (e.key === 'ArrowLeft' || e.key === 'a') { promptRecordIndex = 0; updatePromptRecordUI(); }
-      if (e.key === 'ArrowRight' || e.key === 'd') { promptRecordIndex = 1; updatePromptRecordUI(); }
-      if (e.key === 'Enter' || e.key === 'NumpadEnter') {
-        if (promptRecordIndex === 0) document.getElementById('score-prompt-yes').click();
-        else document.getElementById('score-prompt-no').click();
-        return;
-      }
-    }
-    if (e.key === 'Enter' || e.key === 'NumpadEnter') {
-      return;
-    }
-  }
-
   if(state==='START'){
-    if(e.key==='ArrowUp') { selIdx=(selIdx-1+2)%2; rightArrowCount=0; }
-    else if(e.key==='ArrowDown') { selIdx=(selIdx+1)%2; rightArrowCount=0; }
-    else if(e.key==='Enter'||e.key==='NumpadEnter') { startGame(selIdx===0?'normal':'fly'); rightArrowCount=0; }
+    if(e.key==='ArrowUp') { selIdx=(selIdx-1+2)%2; rightArrowCount=0; leftArrowCount=0; }
+    else if(e.key==='ArrowDown') { selIdx=(selIdx+1)%2; rightArrowCount=0; leftArrowCount=0; }
+    else if(e.key==='Enter'||e.key==='NumpadEnter') { startGame(selIdx===0?'normal':'fly'); rightArrowCount=0; leftArrowCount=0; }
     else if(e.key==='ArrowLeft') {
       const sp=[.5,1,1.5];let i=sp.indexOf(speedMult);if(i<0)i=1;speedMult=sp[Math.max(0,i-1)];
       rightArrowCount=0;
+      leftArrowCount++;
+      if (leftArrowCount >= 6) {
+        leftArrowCount = 0;
+        const key = selIdx === 1 ? 'boy_walk_down_scores_fly' : 'boy_walk_down_scores';
+        localStorage.removeItem(key);
+      }
     }
     else if(e.key==='ArrowRight'){
       const sp=[.5,1,1.5];let i=sp.indexOf(speedMult);if(i<0)i=1;speedMult=sp[Math.min(2,i+1)];
       rightArrowCount++;
+      leftArrowCount=0;
       if (rightArrowCount >= 6) {
         rightArrowCount = 0;
         showTop20(selIdx === 0 ? 'normal' : 'fly');
       }
     } else {
       rightArrowCount = 0;
+      leftArrowCount = 0;
     }
   }
   if(state==='GAME_OVER' && recordFlowState==='NONE'){
@@ -1137,10 +1244,25 @@ const touchPressedDirs = new Set();
     if(isTimeRestricted)return;
     ev.preventDefault();
     if(state==='START'){
-      if(dir==='up') selIdx=(selIdx-1+2)%2;
-      if(dir==='down') selIdx=(selIdx+1)%2;
-      if(dir==='left') {const sp=[.5,1,1.5];let i=sp.indexOf(speedMult);if(i<0)i=1;speedMult=sp[Math.max(0,i-1)];}
-      if(dir==='right'){const sp=[.5,1,1.5];let i=sp.indexOf(speedMult);if(i<0)i=1;speedMult=sp[Math.min(2,i+1)];}
+      if(dir==='up') { selIdx=(selIdx-1+2)%2; leftArrowCount=0; rightArrowCount=0; }
+      if(dir==='down') { selIdx=(selIdx+1)%2; leftArrowCount=0; rightArrowCount=0; }
+      if(dir==='left') {
+        const sp=[.5,1,1.5];let i=sp.indexOf(speedMult);if(i<0)i=1;speedMult=sp[Math.max(0,i-1)];
+        leftArrowCount++; rightArrowCount=0;
+        if(leftArrowCount >= 6) {
+          leftArrowCount = 0;
+          const key = selIdx === 1 ? 'boy_walk_down_scores_fly' : 'boy_walk_down_scores';
+          localStorage.removeItem(key);
+        }
+      }
+      if(dir==='right'){
+        const sp=[.5,1,1.5];let i=sp.indexOf(speedMult);if(i<0)i=1;speedMult=sp[Math.min(2,i+1)];
+        rightArrowCount++; leftArrowCount=0;
+        if(rightArrowCount >= 6) {
+          rightArrowCount = 0;
+          showTop20(selIdx === 0 ? 'normal' : 'fly');
+        }
+      }
     }
     if(state==='GAME_OVER' && recordFlowState==='NONE'){
       if(dir==='up') selIdx=(selIdx-1+2)%2;
@@ -1186,7 +1308,7 @@ const touchPressedDirs = new Set();
     touchPressedDirs.delete(dir);
     el.classList.remove('pressed');
   };
-  el.addEventListener('pointerdown',e=>{on(e);try{el.setPointerCapture(e.pointerId);}catch(_){}});
+  el.addEventListener('pointerdown',e=>{tryResumeBGM();on(e);try{el.setPointerCapture(e.pointerId);}catch(_){}});
   ['pointerup','pointercancel','pointerleave'].forEach(t=>el.addEventListener(t,off));
   el.addEventListener('pointermove',e=>e.preventDefault());
 });
@@ -1232,7 +1354,7 @@ function updateGame(){
         } else {
           player.hurt(-1);
         }
-        if(isNew)player.combo=0; player.onSpikeP=true;
+        player.onSpikeP=true;
       } else if(effType==='heal' || effType==='golden'){
         if(isNew){player.combo++;player.healLand=0;player.score+=2*player.scoreMult;
           // Rainbow safe combo tracking (normal game mode only)
@@ -1244,7 +1366,7 @@ function updateGame(){
           // White (fade) stair: deduct 1 HP unless in extra-bonus mode
           if(player.invertTimer <= 0 && gameMode !== 'fly') player.hurt(-1);
           if(player.rainbow){player.rainbow=false;player.scoreMult=1;player.rainbowOutT=0;}
-          player.combo=0;player.rainbowSafeCombo=0;
+          player.rainbowSafeCombo=0;
         }
         p.fading=true;
       } else if(effType==='purple'){
@@ -1252,7 +1374,7 @@ function updateGame(){
           if(player.invertTimer <= 0){
             if(player.rainbow){player.rainbow=false;player.scoreMult=1;player.rainbowOutT=0;}
             player.invertTimer=0;player.speedTimer=0;
-            player.combo=0;player.rainbowSafeCombo=0;
+            player.rainbowSafeCombo=0;
           }
         }
         if(!p.triggered){p.triggered=true;p.trigT=0;}
@@ -1274,15 +1396,15 @@ function updateGame(){
           let effChosen = chosen;
           // 重新依新類型處理踩踏（遞迴避免：直接套用一次效果）
           if(effChosen==='spike'){
-            player.hurt(-1);player.combo=0; player.onSpikeP=true;
+            player.hurt(-1); player.onSpikeP=true;
           } else if(effChosen==='heal' || effChosen==='golden'){
             player.combo++;player.healLand=0;player.score+=2*player.scoreMult;
             if(player.rainbow){player.rainbowSafeCombo++;if(player.rainbowSafeCombo>=6){player.score+=18;player.rainbowSafeCombo=0;player.extraT=0;}}
           } else if(effChosen==='fade'){
-            player.hurt(-1);if(player.rainbow){player.rainbow=false;player.scoreMult=1;player.rainbowOutT=0;}player.combo=0;player.rainbowSafeCombo=0;
+            player.hurt(-1);if(player.rainbow){player.rainbow=false;player.scoreMult=1;player.rainbowOutT=0;}player.rainbowSafeCombo=0;
             p.fading=true;
           } else if(effChosen==='purple'){
-            if(player.rainbow){player.rainbow=false;player.scoreMult=1;player.rainbowOutT=0;player.invertTimer=0;player.speedTimer=0;}player.combo=0;player.rainbowSafeCombo=0;
+            if(player.rainbow){player.rainbow=false;player.scoreMult=1;player.rainbowOutT=0;player.invertTimer=0;player.speedTimer=0;}player.rainbowSafeCombo=0;
             p.triggered=true;p.trigT=0;
           } else if(effChosen==='colorful'){
             platforms.forEach(pl=>{if(pl!==p)pl.type='heal';});
@@ -1453,10 +1575,12 @@ function drawScoreUI(){
     player.rainbowOutT+=1/60;
     const rAlpha = Math.min(player.rainbowOutT/.25,1)*targetAlpha;
     drawScoreTxt(text,font,GW-80,60,6,13,rAlpha,player.flyMode,targetAlpha);
+    if(player.combo >= 10) drawScoreTxt(`做得好: ${player.combo}`,font,15,60,6,13,rAlpha,player.flyMode,targetAlpha,false,'left');
     // 計時器：秒數本體和第二層外框皆為黑色
     if(player.invertTimer > 0) drawScoreTxt(timerText,font,GW-80,timerY,6,13,rAlpha,player.flyMode,targetAlpha,true);
   } else {
     drawScoreTxt(text,font,GW-80,60,4,9,targetAlpha,player.flyMode,targetAlpha);
+    if(player.combo >= 10) drawScoreTxt(`做得好: ${player.combo}`,font,15,60,4,9,targetAlpha,player.flyMode,targetAlpha,false,'left');
     // 計時器：秒數本體和第二層外框皆為黑色
     if(player.invertTimer > 0) drawScoreTxt(timerText,font,GW-80,timerY,4,9,targetAlpha,player.flyMode,targetAlpha,true);
   }
@@ -1573,6 +1697,7 @@ let lastT=0, acc=0;
 const STEP=1/60;
 
 function loop(ts){
+  updateBGM();
   const dt=Math.min((ts-lastT)/1000,.05);
   lastT=ts; 
   if(!isTimeRestricted){
@@ -1719,11 +1844,12 @@ function showTop20(mode) {
   for(let i=0; i<Math.min(20, scores.length); i++) {
     let m = scores[i].multiplier !== undefined ? scores[i].multiplier : 1.0;
     let s = scores[i].stars !== undefined ? scores[i].stars : 0;
+    let c = scores[i].maxCombo !== undefined ? scores[i].maxCombo : 0;
     let ws = Math.round(scores[i].weighted_score !== undefined ? scores[i].weighted_score : Math.round(scores[i].score * m * 10) / 10);
     let colorStyle = "color: #FFF;";
     let fontSizeStyle = "font-size: 13px;";
     let fontWeight = i < 3 ? "font-weight: bold;" : "";
-    listHtml += `<div style="${colorStyle} ${fontSizeStyle} ${fontWeight} margin: 2px 0; width: max-content; padding-right: 20px;">Top.${i+1} - ${scores[i].id} ┃ 評等:${ws} ┃ 原始:${scores[i].score} ┃ 倍速:${m}x ┃ 星:${s}</div>`;
+    listHtml += `<div style="${colorStyle} ${fontSizeStyle} ${fontWeight} margin: 2px 0; width: max-content; padding-right: 20px;">Top.${i+1} - ${scores[i].id} ┃ 評等:${ws} ┃ 原始:${scores[i].score} ┃ 倍速:${m}x ┃ 做得好:${c} ┃ 星:${s}</div>`;
   }
   document.getElementById('score-rank-list').innerHTML = listHtml;
   document.getElementById('score-rank-overlay').style.display = 'flex';
@@ -1765,8 +1891,23 @@ document.getElementById('score-input-confirm').addEventListener('click', () => {
   if(!id) id = "Unknown";
   
   let scores = loadScores();
-  const weighted = Math.round(player.score * startingSpeedMult * 10) / 10;
-  scores.push({id: id, score: player.score, multiplier: startingSpeedMult, stars: gameRating, weighted_score: weighted});
+  let comboBonusRate = 0;
+  if (startingSpeedMult >= 1.5) {
+    if (player.maxCombo >= 50) comboBonusRate = 0.30;
+    else if (player.maxCombo >= 32) comboBonusRate = 0.25;
+    else if (player.maxCombo >= 16) comboBonusRate = 0.175;
+    else if (player.maxCombo >= 10) comboBonusRate = 0.125;
+  } else {
+    if (player.maxCombo >= 50) comboBonusRate = 0.25;
+    else if (player.maxCombo >= 32) comboBonusRate = 0.175;
+    else if (player.maxCombo >= 16) comboBonusRate = 0.125;
+    else if (player.maxCombo >= 10) comboBonusRate = 0.10;
+  }
+  
+  const comboBonus = Math.round(player.score * comboBonusRate);
+  const weighted = Math.round(player.score * startingSpeedMult) + comboBonus;
+  
+  scores.push({id: id, score: player.score, multiplier: startingSpeedMult, maxCombo: player.maxCombo, stars: gameRating, weighted_score: weighted});
   scores.sort((a,b) => (b.weighted_score ?? b.score) - (a.weighted_score ?? a.score));
   saveScores(scores);
   
@@ -1796,6 +1937,7 @@ document.getElementById('score-input-confirm').addEventListener('click', () => {
   for(let i=0; i<Math.min(20, scores.length); i++) {
     let m = scores[i].multiplier !== undefined ? scores[i].multiplier : 1.0;
     let s = scores[i].stars !== undefined ? scores[i].stars : 0;
+    let c = scores[i].maxCombo !== undefined ? scores[i].maxCombo : 0;
     let ws = Math.round(scores[i].weighted_score !== undefined ? scores[i].weighted_score : Math.round(scores[i].score * m * 10) / 10);
     let isCurrent = (rank > 0 && i === rank - 1);
     let colorStyle = isCurrent ? "" : "color: #FFF;";
@@ -1803,7 +1945,7 @@ document.getElementById('score-input-confirm').addEventListener('click', () => {
     let idAttr = isCurrent ? "id='current-record-item'" : "";
     let fontWeight = (isCurrent || i < 3) ? "font-weight: bold;" : "";
     let rowClass = isCurrent ? "class='record-glow'" : "";
-    listHtml += `<div ${idAttr} ${rowClass} style="${colorStyle} ${fontSizeStyle} ${fontWeight} margin: 2px 0; width: max-content; padding-right: 20px;">Top.${i+1} - ${scores[i].id} ┃ 評等:${ws} ┃ 原始:${scores[i].score} ┃ 倍速:${m}x ┃ 星:${s}</div>`;
+    listHtml += `<div ${idAttr} ${rowClass} style="${colorStyle} ${fontSizeStyle} ${fontWeight} margin: 2px 0; width: max-content; padding-right: 20px;">Top.${i+1} - ${scores[i].id} ┃ 評等:${ws} ┃ 原始:${scores[i].score} ┃ 倍速:${m}x ┃ 做得好:${c} ┃ 星:${s}</div>`;
   }
   document.getElementById('score-rank-list').innerHTML = listHtml;
   document.getElementById('score-rank-overlay').style.display = 'flex';
