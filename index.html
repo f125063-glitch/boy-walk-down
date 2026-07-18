@@ -280,7 +280,7 @@ const ctx    = canvas.getContext('2d');
 canvas.width = GW; canvas.height = GH;
 const wrapper = document.getElementById('wrapper');
 let CS = 1; // canvasScale
-let layoutMode = 0; // 切換方向鍵配置模式 (0-9)
+let layoutMode = 0; // 切換方向鍵配置模式 (0-11)
 let useGesture = false; // 使用手勢
 
 function resize() {
@@ -359,6 +359,18 @@ function layoutBtns(cw,ch) {
     pos('tb-right', null,           mg + bw + sp,   bt);
     pos('tb-up',    null,           mg,             bt);
     pos('tb-down',  mg,             null,           bt);
+  } else if (layoutMode === 10) {
+    // 9. 在底部左邊: 方向鍵依序為"左/下", 並且在同一列; 在底部右邊: 方向鍵"上/右", 與其他方向鍵在同一列
+    pos('tb-left',  mg,           null,         bt);
+    pos('tb-down',  mg + bw + sp, null,         bt);
+    pos('tb-up',    null,         mg + bw + sp, bt);
+    pos('tb-right', null,         mg,           bt);
+  } else if (layoutMode === 11) {
+    // 10. 在底部左邊: 方向鍵依序為"左/上", 並且在同一列; 在底部右邊: 方向鍵"下/右", 與其他方向鍵在同一列
+    pos('tb-left',  mg,           null,         bt);
+    pos('tb-up',    mg + bw + sp, null,         bt);
+    pos('tb-down',  null,         mg + bw + sp, bt);
+    pos('tb-right', null,         mg,           bt);
   }
 }
 window.addEventListener('resize', resize);
@@ -1078,7 +1090,7 @@ function handleClick(mx,my){
       }
       return;
     }
-    if(inR(mx,my,BSWITCH)){layoutMode=(layoutMode+1)%10;resize();return;}
+    if(inR(mx,my,BSWITCH)){layoutMode=(layoutMode+1)%12;resize();return;}
     if(inR(mx,my,BGESTURE)){useGesture=!useGesture;resize();return;}
   }
   if(state==='PLAYING'||state==='PAUSED'){
