@@ -1456,8 +1456,8 @@ function updateGame(){
         if(player.hp<player.maxHp&&p.healed<3){player.healLand++;if(player.healLand>=45){player.healLand=0;player.hurt(1);p.healed++;}}
       } else if(effType==='fade'){
         if(isNew){
-          // White (fade) stair: deduct 1 HP unless in extra-bonus mode or 1.0x speed (no landing HP deduction at 1.0x)
-          if(player.invertTimer <= 0 && gameMode !== 'fly' && startingSpeedMult !== 1.0) player.hurt(-1);
+          // White (fade) stair: deduct 1 HP unless in fly mode or extra-bonus mode
+          if(player.invertTimer <= 0 && gameMode !== 'fly' && !player.isBonusBgm) player.hurt(-1);
           if(player.rainbow){player.rainbow=false;player.scoreMult=1;player.rainbowOutT=0;}
           player.rainbowSafeCombo=0;
         }
@@ -1494,7 +1494,7 @@ function updateGame(){
             player.combo++;player.healLand=0;player.score+=2*player.scoreMult;
             if(player.rainbow){player.rainbowSafeCombo++;if(player.rainbowSafeCombo>=6){player.score+=18;player.rainbowSafeCombo=0;player.extraT=0;}}
           } else if(effChosen==='fade'){
-            if(startingSpeedMult !== 1.0) player.hurt(-1); if(player.rainbow){player.rainbow=false;player.scoreMult=1;player.rainbowOutT=0;}player.rainbowSafeCombo=0;
+            if(!player.isBonusBgm) player.hurt(-1); if(player.rainbow){player.rainbow=false;player.scoreMult=1;player.rainbowOutT=0;}player.rainbowSafeCombo=0;
             p.fading=true;
           } else if(effChosen==='purple'){
             if(player.rainbow){player.rainbow=false;player.scoreMult=1;player.rainbowOutT=0;player.invertTimer=0;player.speedTimer=0;}player.rainbowSafeCombo=0;
