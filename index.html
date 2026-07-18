@@ -40,6 +40,17 @@
     #tb-up.pressed    { border-color: rgba(220,160,0,0.95) !important;  background: rgba(255,195,0,0.35) !important; }
     #tb-down.pressed  { border-color: rgba(220,40,40,0.95) !important;  background: rgba(255,70,70,0.35) !important; }
 
+    /* Volume buttons */
+    #tb-vol-down { background:rgba(100,220,130,0.18); border-color:rgba(120,240,150,0.55); }
+    #tb-vol-up   { background:rgba(100,220,130,0.18); border-color:rgba(120,240,150,0.55); }
+    #tb-vol-down.pressed { border-color:rgba(40,180,80,0.95) !important; background:rgba(100,220,130,0.35) !important; }
+    #tb-vol-up.pressed   { border-color:rgba(40,180,80,0.95) !important; background:rgba(100,220,130,0.35) !important; }
+    .tbtn.vol-disabled {
+      opacity: 0.28 !important;
+      pointer-events: none !important;
+      filter: grayscale(1);
+    }
+
     @keyframes flash-white {
       0% {
         background-color: rgba(255, 255, 255, 1) !important;
@@ -194,6 +205,8 @@
   <div class="tbtn" id="tb-right">▶</div>
   <div class="tbtn" id="tb-up">▲</div>
   <div class="tbtn" id="tb-down">▼</div>
+  <div class="tbtn" id="tb-vol-down" style="display:none">🔉</div>
+  <div class="tbtn" id="tb-vol-up"   style="display:none">🔊</div>
 
   <!-- Time Limit Overlay -->
   <div id="time-limit-overlay">
@@ -372,6 +385,14 @@ function layoutBtns(cw,ch) {
     pos('tb-down',  null,         mg + bw + sp, bt);
     pos('tb-right', null,         mg,           bt);
   }
+  // ── 音量按鈕：置於紅色尖刺下方左右兩側（尖刺底部在 canvas y=70，位置永遠更新，顯示由 updateVolBtns 控制）──
+  const volEl = document.getElementById('tb-vol-down');
+  const volUpEl = document.getElementById('tb-vol-up');
+  if (volEl && volUpEl) {
+    const spikeBottom = Math.round((70 + 6) * CS); // 尖刺底 y=70，加 6px 間距
+    volEl.style.cssText += `;width:${bw}px;height:${bh}px;font-size:${fs};left:${mg}px;right:auto;bottom:auto;top:${spikeBottom}px;`;
+    volUpEl.style.cssText += `;width:${bw}px;height:${bh}px;font-size:${fs};right:${mg}px;left:auto;bottom:auto;top:${spikeBottom}px;`;
+  }
 }
 window.addEventListener('resize', resize);
 resize();
@@ -446,6 +467,8 @@ ph=0;
 let sessionBGM = {};
 let currentBgmFolder = '';
 let currentBgmAudio = null;
+let bgmVolume = 1.0;      // 0.0 ~ 1.0，步進 0.1
+let bgmAvailable = false; // 是否有可播放的 BGM
 
 async function playRandomBGM(folderPath) {
   if (currentBgmFolder === folderPath) return; 
@@ -456,8 +479,11 @@ async function playRandomBGM(folderPath) {
   if (sessionBGM[folderPath]) {
     const audio = new Audio(sessionBGM[folderPath]);
     audio.loop = true;
+    audio.volume = bgmVolume;
     audio.play().catch(e => {});
     currentBgmAudio = audio;
+    bgmAvailable = true;
+    updateVolBtns();
     return;
   }
 
@@ -479,8 +505,11 @@ async function playRandomBGM(folderPath) {
     sessionBGM[folderPath] = audioUrl;
     const audio = new Audio(audioUrl);
     audio.loop = true;
+    audio.volume = bgmVolume;
     audio.play().catch(e => {});
     currentBgmAudio = audio;
+    bgmAvailable = true;
+    updateVolBtns();
   } else {
     let attempts = [1,2,3,4,5,6,7,8,9,10];
     attempts.sort(() => Math.random() - 0.5);
@@ -490,11 +519,14 @@ async function playRandomBGM(folderPath) {
       const audioUrl = `${folderPath}/${idx}.mp3`;
       const audio = new Audio(audioUrl);
       audio.loop = true;
+      audio.volume = bgmVolume;
       audio.oncanplay = () => {
         if (currentBgmFolder !== folderPath) return;
         sessionBGM[folderPath] = audioUrl;
         audio.play().catch(e => {});
         currentBgmAudio = audio;
+        bgmAvailable = true;
+        updateVolBtns();
       };
       audio.onerror = () => { tryNext(); };
     };
@@ -518,6 +550,28 @@ function updateBGM() {
 
 function tryResumeBGM() {
   if (currentBgmAudio && currentBgmAudio.paused) currentBgmAudio.play().catch(e => {});
+}
+
+function updateVolBtns() {
+  const vd = document.getElementById('tb-vol-down');
+  const vu = document.getElementById('tb-vol-up');
+  if (!vd || !vu) return;
+  const isPlaying = (state === 'PLAYING');
+  const show = bgmAvailable && !isPlaying && !useGesture;
+  vd.style.display = show ? 'flex' : 'none';
+  vu.style.display = show ? 'flex' : 'none';
+  // 最低音量時降低按鈕反灰
+  if (bgmVolume <= 0) {
+    vd.classList.add('vol-disabled');
+  } else {
+    vd.classList.remove('vol-disabled');
+  }
+  // 最高音量時增加按鈕反灰
+  if (bgmVolume >= 1.0) {
+    vu.classList.add('vol-disabled');
+  } else {
+    vu.classList.remove('vol-disabled');
+  }
 }
 
 /* ═══════════════════════ UTILITIES ═══════════════════════ */
@@ -1325,6 +1379,33 @@ const touchPressedDirs = new Set();
   el.addEventListener('pointermove',e=>e.preventDefault());
 });
 
+// 音量按鈕事件
+['vol-down','vol-up'].forEach(id => {
+  const el = document.getElementById('tb-' + id);
+  if (!el) return;
+  const onPress = (e) => {
+    e.preventDefault();
+    if (el.classList.contains('vol-disabled')) return;
+    tryResumeBGM();
+    const step = 0.1;
+    if (id === 'vol-down') {
+      bgmVolume = Math.max(0, Math.round((bgmVolume - step) * 10) / 10);
+    } else {
+      bgmVolume = Math.min(1.0, Math.round((bgmVolume + step) * 10) / 10);
+    }
+    if (currentBgmAudio) currentBgmAudio.volume = bgmVolume;
+    el.classList.add('pressed');
+    updateVolBtns();
+  };
+  const onRelease = (e) => {
+    e.preventDefault();
+    el.classList.remove('pressed');
+  };
+  el.addEventListener('pointerdown', e => { onPress(e); try { el.setPointerCapture(e.pointerId); } catch(_) {} });
+  ['pointerup','pointercancel','pointerleave'].forEach(t => el.addEventListener(t, onRelease));
+  el.addEventListener('pointermove', e => e.preventDefault());
+});
+
 /* ═══════════════════════ UPDATE ═══════════════════════ */
 function updateGame(){
   if(state!=='PLAYING')return;
@@ -1745,6 +1826,7 @@ function loop(ts){
     tickAcc = 0;
   }
 
+  updateVolBtns();
   drawFrame();
   requestAnimationFrame(loop);
 }
