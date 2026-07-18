@@ -1456,8 +1456,8 @@ function updateGame(){
         if(player.hp<player.maxHp&&p.healed<3){player.healLand++;if(player.healLand>=45){player.healLand=0;player.hurt(1);p.healed++;}}
       } else if(effType==='fade'){
         if(isNew){
-          // White (fade) stair: deduct 1 HP unless in extra-bonus mode
-          if(player.invertTimer <= 0 && gameMode !== 'fly') player.hurt(-1);
+          // White (fade) stair: deduct 1 HP unless in extra-bonus mode or 1.0x speed (no landing HP deduction at 1.0x)
+          if(player.invertTimer <= 0 && gameMode !== 'fly' && startingSpeedMult !== 1.0) player.hurt(-1);
           if(player.rainbow){player.rainbow=false;player.scoreMult=1;player.rainbowOutT=0;}
           player.rainbowSafeCombo=0;
         }
@@ -1494,7 +1494,7 @@ function updateGame(){
             player.combo++;player.healLand=0;player.score+=2*player.scoreMult;
             if(player.rainbow){player.rainbowSafeCombo++;if(player.rainbowSafeCombo>=6){player.score+=18;player.rainbowSafeCombo=0;player.extraT=0;}}
           } else if(effChosen==='fade'){
-            player.hurt(-1);if(player.rainbow){player.rainbow=false;player.scoreMult=1;player.rainbowOutT=0;}player.rainbowSafeCombo=0;
+            if(startingSpeedMult !== 1.0) player.hurt(-1); if(player.rainbow){player.rainbow=false;player.scoreMult=1;player.rainbowOutT=0;}player.rainbowSafeCombo=0;
             p.fading=true;
           } else if(effChosen==='purple'){
             if(player.rainbow){player.rainbow=false;player.scoreMult=1;player.rainbowOutT=0;player.invertTimer=0;player.speedTimer=0;}player.rainbowSafeCombo=0;
@@ -1943,7 +1943,7 @@ function showTop20(mode) {
     let colorStyle = "color: #FFF;";
     let fontSizeStyle = "font-size: 13px;";
     let fontWeight = i < 3 ? "font-weight: bold;" : "";
-    listHtml += `<div style="${colorStyle} ${fontSizeStyle} ${fontWeight} margin: 2px 0; width: max-content; padding-right: 20px;">Top.${i+1} - ${scores[i].id} ┃ 評等:${ws} ┃ 原始:${scores[i].score} ┃ 倍速:${m}x ┃ 做得好:${c} ┃ 星:${s}</div>`;
+    listHtml += `<div style="${colorStyle} ${fontSizeStyle} ${fontWeight} margin: 2px 0; width: max-content; padding-right: 20px;">Top.${i+1} - ${scores[i].id} ┃ 評等:${ws} ┃ 倍速:${m}x ┃ 做得好:${c} ┃ 星:${s}</div>`;
   }
   document.getElementById('score-rank-list').innerHTML = listHtml;
   document.getElementById('score-rank-overlay').style.display = 'flex';
@@ -1987,11 +1987,20 @@ document.getElementById('score-input-confirm').addEventListener('click', () => {
   let scores = loadScores();
   let comboBonusRate = 0;
   if (startingSpeedMult >= 1.5) {
+    // 1.5x speed combo bonus tiers
     if (player.maxCombo >= 50) comboBonusRate = 0.30;
     else if (player.maxCombo >= 32) comboBonusRate = 0.25;
     else if (player.maxCombo >= 16) comboBonusRate = 0.175;
     else if (player.maxCombo >= 10) comboBonusRate = 0.125;
+  } else if (startingSpeedMult === 1.0) {
+    // 1.0x speed combo bonus tiers: 6/16/32/50/72 → 0%/10%/12.5%/17.5%/25%
+    if (player.maxCombo >= 72) comboBonusRate = 0.25;
+    else if (player.maxCombo >= 50) comboBonusRate = 0.175;
+    else if (player.maxCombo >= 32) comboBonusRate = 0.125;
+    else if (player.maxCombo >= 16) comboBonusRate = 0.10;
+    else if (player.maxCombo >= 6) comboBonusRate = 0.0;
   } else {
+    // 0.5x speed combo bonus tiers
     if (player.maxCombo >= 50) comboBonusRate = 0.25;
     else if (player.maxCombo >= 32) comboBonusRate = 0.175;
     else if (player.maxCombo >= 16) comboBonusRate = 0.125;
@@ -2039,7 +2048,7 @@ document.getElementById('score-input-confirm').addEventListener('click', () => {
     let idAttr = isCurrent ? "id='current-record-item'" : "";
     let fontWeight = (isCurrent || i < 3) ? "font-weight: bold;" : "";
     let rowClass = isCurrent ? "class='record-glow'" : "";
-    listHtml += `<div ${idAttr} ${rowClass} style="${colorStyle} ${fontSizeStyle} ${fontWeight} margin: 2px 0; width: max-content; padding-right: 20px;">Top.${i+1} - ${scores[i].id} ┃ 評等:${ws} ┃ 原始:${scores[i].score} ┃ 倍速:${m}x ┃ 做得好:${c} ┃ 星:${s}</div>`;
+    listHtml += `<div ${idAttr} ${rowClass} style="${colorStyle} ${fontSizeStyle} ${fontWeight} margin: 2px 0; width: max-content; padding-right: 20px;">Top.${i+1} - ${scores[i].id} ┃ 評等:${ws} ┃ 倍速:${m}x ┃ 做得好:${c} ┃ 星:${s}</div>`;
   }
   document.getElementById('score-rank-list').innerHTML = listHtml;
   document.getElementById('score-rank-overlay').style.display = 'flex';
