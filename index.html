@@ -474,25 +474,30 @@ async function initBackgrounds() {
   
   // If fetch failed (e.g. running via file://), probe common names
   if (beginBgFiles.length === 0 && specialBgFiles.length === 0) {
-    const probeTasks = [];
-    const checkAndPush = async (url, arr) => {
-      if (await probeImage(url)) arr.push(url);
+    const probeSequence = async (prefix, arr) => {
+      for (let i = 1; i <= 30; i++) {
+        const num = i.toString().padStart(2, '0');
+        const numPlain = i.toString();
+        
+        let found = false;
+        if (await probeImage(`./${prefix}${num}.png`)) {
+          arr.push(`./${prefix}${num}.png`);
+          found = true;
+        } else if (await probeImage(`./${prefix}${numPlain}.png`)) {
+          arr.push(`./${prefix}${numPlain}.png`);
+          found = true;
+        }
+        
+        // If we didn't find the current number (e.g., 03 or 3), stop checking further numbers
+        if (!found) break;
+      }
     };
 
-    for (let i = 1; i <= 30; i++) {
-      const num = i.toString().padStart(2, '0');
-      const numPlain = i.toString();
-      
-      probeTasks.push(checkAndPush(`./Begin_BG${num}.png`, beginBgFiles));
-      probeTasks.push(checkAndPush(`./Begin_BG${numPlain}.png`, beginBgFiles));
-      
-      probeTasks.push(checkAndPush(`./Special_BG${num}.png`, specialBgFiles));
-      probeTasks.push(checkAndPush(`./Special_BG${numPlain}.png`, specialBgFiles));
-
-      probeTasks.push(checkAndPush(`./End_BG${num}.png`, endBgFiles));
-      probeTasks.push(checkAndPush(`./End_BG${numPlain}.png`, endBgFiles));
-    }
-    await Promise.all(probeTasks);
+    await Promise.all([
+      probeSequence('Begin_BG', beginBgFiles),
+      probeSequence('Special_BG', specialBgFiles),
+      probeSequence('End_BG', endBgFiles)
+    ]);
   }
   
   beginBgFiles = [...new Set(beginBgFiles)];
