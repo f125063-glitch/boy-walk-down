@@ -1663,7 +1663,14 @@ function updateGame(){
       break;
     }
   }
-  if(onPlat)player.hist=[];
+  if(onPlat) {
+    player.hist=[];
+    if(player.curPlat && player.curPlat.type === 'brown') {
+      player.x += player.curPlat.brownDir * 1.5;
+      if(player.x + player.w < 0) player.x = GW;
+      else if(player.x > GW) player.x = -player.w;
+    }
+  }
 
   // Penetration logic is now handled in the keydown event (double-press DOWN)
 
@@ -1757,7 +1764,11 @@ function drawBg(){
     else if (player.score >= 201) bgAlpha = 0.90;
     else if (player.score >= 101) bgAlpha = 0.85;
     ctx.globalAlpha=bgAlpha;
-    if(['START','GAME_OVER'].includes(state) && !isTimeRestricted)bgX=((bgX-BG_SPEED)%GW+GW)%GW;
+    if(['START','GAME_OVER'].includes(state) && !isTimeRestricted) {
+      bgX = ((bgX - BG_SPEED) % GW + GW) % GW;
+    } else if(state === 'PLAYING' && player && player.invertTimer > 0) {
+      bgX = ((bgX + BG_SPEED) % GW + GW) % GW;
+    }
     const bx=Math.round(bgX);
     ctx.drawImage(activeBg,bx,   0,GW,GH);
     ctx.drawImage(activeBg,bx-GW,0,GW,GH);
