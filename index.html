@@ -442,6 +442,12 @@ async function loadBackgroundsFromDir(folderPath) {
 }
 
 async function probeImage(url) {
+  try {
+    if (window.location.protocol !== 'file:') {
+      const response = await fetch(url, { method: 'HEAD' });
+      return response.ok;
+    }
+  } catch (e) {}
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => resolve(true);
@@ -468,28 +474,25 @@ async function initBackgrounds() {
   
   // If fetch failed (e.g. running via file://), probe common names
   if (beginBgFiles.length === 0 && specialBgFiles.length === 0) {
+    const probeTasks = [];
+    const checkAndPush = async (url, arr) => {
+      if (await probeImage(url)) arr.push(url);
+    };
+
     for (let i = 1; i <= 30; i++) {
       const num = i.toString().padStart(2, '0');
       const numPlain = i.toString();
       
-      // Probe Begin_BG
-      const b1 = `./Begin_BG${num}.png`;
-      const b2 = `./Begin_BG${numPlain}.png`;
-      if (await probeImage(b1)) beginBgFiles.push(b1);
-      if (await probeImage(b2)) beginBgFiles.push(b2);
+      probeTasks.push(checkAndPush(`./Begin_BG${num}.png`, beginBgFiles));
+      probeTasks.push(checkAndPush(`./Begin_BG${numPlain}.png`, beginBgFiles));
       
-      // Probe Special_BG
-      const s1 = `./Special_BG${num}.png`;
-      const s2 = `./Special_BG${numPlain}.png`;
-      if (await probeImage(s1)) specialBgFiles.push(s1);
-      if (await probeImage(s2)) specialBgFiles.push(s2);
+      probeTasks.push(checkAndPush(`./Special_BG${num}.png`, specialBgFiles));
+      probeTasks.push(checkAndPush(`./Special_BG${numPlain}.png`, specialBgFiles));
 
-      // Probe End_BG
-      const e1 = `./End_BG${num}.png`;
-      const e2 = `./End_BG${numPlain}.png`;
-      if (await probeImage(e1)) endBgFiles.push(e1);
-      if (await probeImage(e2)) endBgFiles.push(e2);
+      probeTasks.push(checkAndPush(`./End_BG${num}.png`, endBgFiles));
+      probeTasks.push(checkAndPush(`./End_BG${numPlain}.png`, endBgFiles));
     }
+    await Promise.all(probeTasks);
   }
   
   beginBgFiles = [...new Set(beginBgFiles)];
