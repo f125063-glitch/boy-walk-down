@@ -402,91 +402,12 @@ let bgImg=null, bgImgRainbow9=null, bgX=0;
 const _bi=new Image();
 _bi.onload=()=>{ bgImg=_bi; };
 _bi.onerror=()=>{ bgImg=null; };
+_bi.src='./GPT_background_rainbow0.png';
 const _bi9=new Image();
 _bi9.onload=()=>{ bgImgRainbow9=_bi9; };
 _bi9.onerror=()=>{ bgImgRainbow9=null; };
+_bi9.src='./GPT_background_rainbow9.png';
 const BG_SPEED=0.5;
-
-let beginBgFiles = [];
-let specialBgFiles = [];
-
-async function loadBackgroundsFromDir(folderPath) {
-  try {
-    const res = await fetch(folderPath + '/');
-    if (res.ok) {
-      const text = await res.text();
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(text, 'text/html');
-      const allFiles = Array.from(doc.querySelectorAll('a'))
-        .map(a => a.getAttribute('href'))
-        .filter(href => href && href.toLowerCase().endsWith('.png'));
-      
-      allFiles.forEach(f => {
-        const parts = f.split('/');
-        const filename = parts[parts.length - 1];
-        // resolve path robustly if the server returns relative links
-        let url = f;
-        if (!url.startsWith('http') && !url.startsWith('/')) {
-            url = folderPath + (folderPath.endsWith('/') ? '' : '/') + f;
-        }
-        if (filename.startsWith('Begin_BG')) beginBgFiles.push(url);
-        if (filename.startsWith('Special_BG')) specialBgFiles.push(url);
-      });
-    }
-  } catch (e) {}
-}
-
-async function probeImage(url) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => resolve(true);
-    img.onerror = () => resolve(false);
-    img.src = url;
-  });
-}
-
-function randomizeBgs() {
-  if (beginBgFiles.length > 0) {
-    _bi.src = beginBgFiles[Math.floor(Math.random() * beginBgFiles.length)];
-  }
-  if (specialBgFiles.length > 0) {
-    _bi9.src = specialBgFiles[Math.floor(Math.random() * specialBgFiles.length)];
-  }
-}
-
-async function initBackgrounds() {
-  await loadBackgroundsFromDir('.');
-  await loadBackgroundsFromDir('./background');
-  
-  // If fetch failed (e.g. running via file://), probe common names
-  if (beginBgFiles.length === 0 && specialBgFiles.length === 0) {
-    for (let i = 1; i <= 30; i++) {
-      const num = i.toString().padStart(2, '0');
-      const numPlain = i.toString();
-      
-      // Probe Begin_BG
-      const b1 = `./Begin_BG${num}.png`;
-      const b2 = `./Begin_BG${numPlain}.png`;
-      if (await probeImage(b1)) beginBgFiles.push(b1);
-      if (await probeImage(b2)) beginBgFiles.push(b2);
-      
-      // Probe Special_BG
-      const s1 = `./Special_BG${num}.png`;
-      const s2 = `./Special_BG${numPlain}.png`;
-      if (await probeImage(s1)) specialBgFiles.push(s1);
-      if (await probeImage(s2)) specialBgFiles.push(s2);
-    }
-  }
-  
-  beginBgFiles = [...new Set(beginBgFiles)];
-  specialBgFiles = [...new Set(specialBgFiles)];
-  
-  if(beginBgFiles.length === 0) beginBgFiles = ['./GPT_background_rainbow0.png'];
-  if(specialBgFiles.length === 0) specialBgFiles = ['./GPT_background_rainbow9.png'];
-  
-  randomizeBgs();
-}
-initBackgrounds();
 
 /* ═══════════════════════ AUDIO ═══════════════════════ */
 let AC; try{ AC=new(window.AudioContext||window.webkitAudioContext)(); }catch(e){}
@@ -1233,7 +1154,7 @@ function handleClick(mx,my){
     if(inXYWH(mx,my,GW/2-80,btnSY,160,60)){startGame(state==='GAME_OVER'?gameMode:'normal');return;}
     if(inXYWH(mx,my,GW/2-80,btnFY,160,60)){
       if(state==='GAME_OVER') {
-        state='START';speedMult=1;selIdx=0;btnSY=GH/2-30;btnFY=GH/2+50;updateBGM();randomizeBgs();
+        state='START';speedMult=1;selIdx=0;btnSY=GH/2-30;btnFY=GH/2+50;updateBGM();
       } else {
         startGame('fly');
       }
@@ -1244,7 +1165,7 @@ function handleClick(mx,my){
   }
   if(state==='PLAYING'||state==='PAUSED'){
     if(inR(mx,my,BP)){state=state==='PAUSED'?'PLAYING':'PAUSED';updateBGM();return;}
-    if(inR(mx,my,BS)){state='START';speedMult=1;btnSY=GH/2-30;btnFY=GH/2+50;updateBGM();randomizeBgs();return;}
+    if(inR(mx,my,BS)){state='START';speedMult=1;btnSY=GH/2-30;btnFY=GH/2+50;updateBGM();return;}
   }
   if(['START','GAME_OVER','PAUSED'].includes(state)){
     if(inR(mx,my,B05)){speedMult=0.5;if(state==='GAME_OVER')scoreStyleAlt=true;return;}
@@ -1334,7 +1255,7 @@ window.addEventListener('keydown',e=>{
     if(e.key==='ArrowDown') selIdx=(selIdx+1)%2;
     if(e.key==='Enter'||e.key==='NumpadEnter'){
       if(selIdx===1){
-        state='START';speedMult=1;selIdx=0;btnSY=GH/2-30;btnFY=GH/2+50;randomizeBgs();
+        state='START';speedMult=1;selIdx=0;btnSY=GH/2-30;btnFY=GH/2+50;
       } else {
         startGame(gameMode);
       }
@@ -1348,7 +1269,7 @@ window.addEventListener('keydown',e=>{
       else escCnt=1;
     }
     if(e.key==='ArrowDown'||e.key==='s'){
-      if(escCnt===5){escCnt=0;state='START';speedMult=1;btnSY=GH/2-30;btnFY=GH/2+50;randomizeBgs();}
+      if(escCnt===5){escCnt=0;state='START';speedMult=1;btnSY=GH/2-30;btnFY=GH/2+50;}
       else {
         escCnt=0;
         // Double-press DOWN to penetrate platform
@@ -1718,8 +1639,8 @@ function updateGame(){
 
 /* ═══════════════════════ DRAW ═══════════════════════ */
 function drawBg(){
-  // In extra-bonus mode, use Special_BG (bgImgRainbow9); otherwise Begin_BG (bgImg)
-  const useInvert = (player && player.isBonusBgm);
+  // In extra-bonus/grayscale mode, use rainbow9 background; otherwise default
+  const useInvert = (player && player.invertTimer > 0);
   const activeBg = useInvert ? (bgImgRainbow9 || bgImg) : bgImg;
   if(activeBg){
     let bgAlpha = 0.8;
