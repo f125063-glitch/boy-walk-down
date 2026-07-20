@@ -1633,10 +1633,10 @@ function updateGame(){
         }
         if(player.hp<player.maxHp&&p.healed<3){player.healLand++;if(player.healLand>=45){player.healLand=0;player.hurt(1);p.healed++;}}
       } else if(effType==='black'){
-        // 黑色階梯：隨機變成任一顏色階梯（灰/白/綠/紅/咖啡/紫/彩虹），各 1/7 機率
+        // 黑色階梯：隨機變成任一顏色階梯（灰/白/綠/紅/淡藍漸層/淡紫漸層/紫/彩虹），各 1/8 機率
         if(isNew){
-          const blackTypes=['normal','fade','heal','spike','brown','purple','colorful'];
-          const chosen=blackTypes[Math.floor(Math.random()*7)];
+          const blackTypes=['normal','fade','heal','spike','brown','redpurple','purple','colorful'];
+          const chosen=blackTypes[Math.floor(Math.random()*8)];
           p.type=chosen;
           p.healed=0;p.fading=false;p.fadeT=0;p.triggered=false;p.trigT=0;p.hist=[];
           if(chosen==='brown'){p.brownDir=(Math.random()<0.5)?-1:1;p.brownOob=false;}
@@ -1656,12 +1656,17 @@ function updateGame(){
             if(player.rainbow){player.rainbow=false;player.scoreMult=1;player.rainbowOutT=0;player.invertTimer=0;player.speedTimer=0;}player.rainbowSafeCombo=0;
             player.safeCombo=0;
             p.triggered=true;p.trigT=0;
+          } else if(effChosen==='redpurple'){
+            if(player.invertTimer <= 0 && gameMode !== 'fly' && !player.isBonusBgm){
+              player.hurt(-2);
+            }
+            player.stunTimer = 1.5;
           } else if(effChosen==='colorful'){
             platforms.forEach(pl=>{if(pl!==p)pl.type='heal';});
             player.combo++;player.score+=1*player.scoreMult;
             player.safeCombo+=2; // colorful stair gives +2 to safe streak
           } else if(effChosen==='brown'){
-            // 咖啡色：combo+3，分數+1（同灰色）
+            // 淡藍漸層：combo+3，分數+1（同灰色）
             player.combo+=3;player.normLand=0;player.score+=1*player.scoreMult;
             player.safeCombo++;
             if(player.rainbow){player.rainbowSafeCombo++;if(player.rainbowSafeCombo>=6){player.score+=18;player.rainbowSafeCombo=0;player.extraT=0;player.triggerExtraBonus();}}
