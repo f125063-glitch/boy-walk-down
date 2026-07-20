@@ -849,7 +849,7 @@ function drawScoreTxt(text,font,cx,cy,l1w,l2w,oA=1,fly=false,bA=1,blackMode=fals
 }
 
 /* 3-D Button */
-function drawBtn(x,y,w,h,rgb,text,font,tc='#000',r=8,pressed=false){
+function drawBtn(x,y,w,h,rgb,text,font,tc='#000',r=8,pressed=false,underlined=false){
   ctx.save();
   const sh=pressed?0:4;
   const isGrad = Array.isArray(rgb[0]);
@@ -872,6 +872,15 @@ function drawBtn(x,y,w,h,rgb,text,font,tc='#000',r=8,pressed=false){
   ctx.fillStyle=`rgba(${Math.min(255,cTop[0]+60)},${Math.min(255,cTop[1]+60)},${Math.min(255,cTop[2]+60)},0.5)`; ctx.fill();
   rrect(fx,fy,w,h,r); ctx.strokeStyle='#000'; ctx.lineWidth=2; ctx.stroke();
   ctx.font=font; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillStyle=tc; ctx.fillText(text,fx+w/2,fy+h/2);
+  if (underlined) {
+    const tw = ctx.measureText(text).width;
+    const m = font.match(/(\d+)px/);
+    const fs = m ? parseInt(m[1]) : 20;
+    ctx.beginPath();
+    ctx.moveTo(fx+w/2 - tw/2, fy+h/2 + fs/2 + 4);
+    ctx.lineTo(fx+w/2 + tw/2, fy+h/2 + fs/2 + 4);
+    ctx.strokeStyle = tc; ctx.lineWidth = 3; ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -916,6 +925,7 @@ class Player{
     this.safeCombo=0; // consecutive green/grey/brown steps to trigger rainbow
     this.invertTimer = 0;
     this.speedTimer = 0;
+    this.stunTimer = 0;
     this.hasAchievedSinceDamage = false;
     this.bgmFolder = 'BGM2'; // Tracks current playing BGM folder
   }
@@ -964,6 +974,7 @@ class Player{
   }
 
   move(keys){
+    if(this.stunTimer > 0.25) return;
     if(keys.left) this.x-=PLAYER_SPEED;
     if(keys.right)this.x+=PLAYER_SPEED;
     if(this.right<0)this.x=GW; else if(this.left>GW)this.right=0;
@@ -973,6 +984,7 @@ class Player{
     let wasExtra = (this.w > 30);
     if(this.invertTimer > 0) this.invertTimer = Math.max(0, this.invertTimer - 1/60);
     if(this.speedTimer > 0) this.speedTimer = Math.max(0, this.speedTimer - 1/60);
+    if(this.stunTimer > 0) this.stunTimer = Math.max(0, this.stunTimer - 1/60);
     
     let isExtra = (this.invertTimer > 0);
     if (isExtra && !wasExtra) {
@@ -995,7 +1007,10 @@ class Player{
   }
 
   draw(){
-    const {cx,cy,r}=this;
+    let {cx,cy,r}=this;
+    if(this.stunTimer > 0) {
+      cx += Math.sin(Date.now() / 20) * r * 0.25;
+    }
     // ── up-boost afterimages ──
     for(let i=this.upHist.length-1;i>=0;i--){
       const[hx,hy]=this.upHist[i],f=i/10;
@@ -1136,12 +1151,26 @@ class Platform{
         case 'spike':  col='rgb(220,50,50)'; break;
         case 'heal':   col='rgb(50,220,50)'; break;
         case 'purple': col='rgb(128,0,128)'; break;
+        case 'redpurple': {
+          const p = (Math.sin(Date.now()/300)+1)/2;
+          const rb = Math.round(230 - 102*p);
+          const g = Math.round(150 - 150*p);
+          col = `rgb(${rb},${g},${rb})`;
+          break;
+        }
         case 'fade': {
           const p=this.fading?Math.min(this.fadeT/this.fadeDur,1):0;
           const v=Math.round(211+(255-211)*p); col=`rgb(${v},${v},${v})`; break;
         }
         case 'golden': col='rgb(255,200,0)'; break;
-        case 'brown':  col='rgb(139,90,43)'; break;
+        case 'brown': {
+          const pb = (Math.sin(Date.now()/300)+1)/2;
+          const br = Math.round(80 - 80*pb);
+          const bg = Math.round(180 - 80*pb);
+          const bb = Math.round(255 - 55*pb);
+          col = `rgb(${br},${bg},${bb})`;
+          break;
+        }
         default: col='rgb(100,100,100)';
       }
       if (this.type === 'golden') {
@@ -1376,6 +1405,7 @@ window.addEventListener('keydown',e=>{
         escCnt=0;
         // Double-press DOWN to penetrate platform
         if(state==='PLAYING' && player && player.curPlat && ['normal','heal','golden','colorful','brown'].includes(player.curPlat.type)){
+          if(player.stunTimer > 0.25) return;
           const now = performance.now() / 1000;
           if(now - player.downLastPressTime < 0.4){
             player.downPressCount++;
@@ -1385,7 +1415,7 @@ window.addEventListener('keydown',e=>{
           player.downLastPressTime = now;
           if(player.downPressCount >= 2){
             player.y += 25;
-            if(player.invertTimer <= 0 && player.curPlat.type === 'normal' && gameMode !== 'fly'){
+            if(player.invertTimer <= 0 && (player.curPlat.type === 'normal' || player.curPlat.type === 'brown') && gameMode !== 'fly'){
               player.hurt(-1);
             }
             // 穿透金黃色階梯：回血1格
@@ -1456,6 +1486,7 @@ const touchPressedDirs = new Set();
     }
     // Double-tap DOWN to penetrate (touch version)
     if(dir==='down' && state==='PLAYING' && player && player.curPlat && ['normal','heal','golden','colorful','brown'].includes(player.curPlat.type)){
+      if(player.stunTimer > 0.25) return;
       const now = performance.now() / 1000;
       if(now - player.downLastPressTime < 0.4){
         player.downPressCount++;
@@ -1465,7 +1496,7 @@ const touchPressedDirs = new Set();
       player.downLastPressTime = now;
       if(player.downPressCount >= 2){
         player.y += 25;
-        if(player.invertTimer <= 0 && player.curPlat.type === 'normal' && gameMode !== 'fly'){
+        if(player.invertTimer <= 0 && (player.curPlat.type === 'normal' || player.curPlat.type === 'brown') && gameMode !== 'fly'){
           player.hurt(-1);
         }
         // 穿透金黃色階梯：回血1格
@@ -1536,7 +1567,7 @@ function updateGame(){
       t='golden';
     } else {
       // normal:55%, spike:20%, heal(綠):3.0%, fade(白):10%, purple:5%, colorful(彩色):0.5%, black(黑):0.5%, brown(咖啡):6.0%
-      if(rr<.55)t='normal'; else if(rr<.75)t='spike'; else if(rr<.78)t='heal'; else if(rr<.88)t='fade'; else if(rr<.93)t='purple'; else if(rr<.935)t='colorful'; else if(rr<.940)t='black'; else t='brown';
+      if(rr<.55)t='normal'; else if(rr<.715)t='spike'; else if(rr<.75)t='redpurple'; else if(rr<.78)t='heal'; else if(rr<.88)t='fade'; else if(rr<.93)t='purple'; else if(rr<.935)t='colorful'; else if(rr<.940)t='black'; else t='brown';
     }
     platforms.push(new Platform(Math.random()*(GW-100),GH+20,t));
   }
@@ -1650,6 +1681,13 @@ function updateGame(){
           if(player.rainbow){player.rainbowSafeCombo++;if(player.rainbowSafeCombo>=6){player.score+=18;player.rainbowSafeCombo=0;player.extraT=0;player.triggerExtraBonus();}}
         }
         if(player.hp<player.maxHp&&p.healed<1){player.normLand++;if(player.normLand>=60){player.normLand=0;player.hurt(1);p.healed++;}}
+      } else if(effType==='redpurple') {
+        if(isNew){
+          if(player.invertTimer <= 0 && gameMode !== 'fly' && !player.isBonusBgm){
+            player.hurt(-2);
+          }
+          player.stunTimer = 1.5;
+        }
       } else if(effType==='normal') {
         if(isNew){player.combo++;player.normLand=0;player.score+=1*player.scoreMult;
           player.safeCombo++; // grey counts toward rainbow trigger
@@ -1675,7 +1713,7 @@ function updateGame(){
   // Penetration logic is now handled in the keydown event (double-press DOWN)
 
   // Up boost
-  if(keys.up){
+  if(keys.up && player.stunTimer <= 0.25){
     if(!player.curPlat){
       if(!player.upWas){
         // 第一次離梯下落：允許空中跳躍一次
@@ -1884,8 +1922,8 @@ function drawFrame(){
     const ta=((Date.now()%2000)/2000)*(242/255);
     drawOutlined('球球大冒險',F_LG,'#000',GW/2,GH/3,4,9,'#fff','#000',ta);
     if(mInR([GW/2-80,btnSY,160,60]))selIdx=0; if(mInR([GW/2-80,btnFY,160,60]))selIdx=1;
-    drawBtn(GW/2-80,btnSY,160,60,[[139,0,0],[255,102,102]],'開始挑戰',selIdx===0?F_MED_B:F_MED,'#fff',15);
-    drawBtn(GW/2-80,btnFY,160,60,[[0,100,0],[144,238,144]],'飛高高吧',selIdx===1?F_MED_B:F_MED,'#fff',15);
+    drawBtn(GW/2-80,btnSY,160,60,[[139,0,0],[255,102,102]],'開始挑戰',selIdx===0?F_MED_B:F_MED,'#fff',15,false,selIdx===0);
+    drawBtn(GW/2-80,btnFY,160,60,[[0,100,0],[144,238,144]],'飛高高吧',selIdx===1?F_MED_B:F_MED,'#fff',15,false,selIdx===1);
     drawTopBarUI();
 
   } else if(state==='PLAYING'||state==='PAUSED'){
@@ -1925,8 +1963,8 @@ function drawFrame(){
     if(mInR([GW/2-80,btnSY,160,60]))selIdx=0; if(mInR([GW/2-80,btnFY,160,60]))selIdx=1;
     let colorSY = selIdx === 0 ? [[0,0,255],[128,0,255]] : [[0,0,139],[128,0,128]];
     let colorFY = selIdx === 1 ? [[0,0,255],[128,0,255]] : [[0,0,139],[128,0,128]];
-    drawBtn(GW/2-80,btnSY,160,60,colorSY,'繼續挑戰',selIdx===0?F_MED_B:F_MED,'#fff',15);
-    drawBtn(GW/2-80,btnFY,160,60,colorFY,'回到首頁',selIdx===1?F_MED_B:F_MED,'#fff',15);
+    drawBtn(GW/2-80,btnSY,160,60,colorSY,'繼續挑戰',selIdx===0?F_MED_B:F_MED,'#fff',15,false,selIdx===0);
+    drawBtn(GW/2-80,btnFY,160,60,colorFY,'回到首頁',selIdx===1?F_MED_B:F_MED,'#fff',15,false,selIdx===1);
     drawTopBarUI();
   }
 }
